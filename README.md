@@ -41,36 +41,21 @@ apps/api        — Express API
 packages/shared — Ortak tipler ve Zod şemaları
 ```
 
-## Railway deploy
+## Railway deploy (API)
 
-`@woonwork/shared` private monorepo paketidir. Railway’de **Root Directory’yi `apps/api` veya `apps/web` yapma** — npm registry’de bulunamaz (`E404`).
+Önemli: **Root Directory boş olmalı** (repo kökü). `apps/api` yapma.
 
-Her iki servis için:
+1. Settings → Root Directory → boş / `.`
+2. Builder: **Nixpacks** (varsayılan; `railway.toml` + `nixpacks.toml`)
+3. Watch Paths (opsiyonel): `apps/api/**`, `packages/shared/**`
+4. Env:
+   - `DATABASE_URL`
+   - `JWT_ACCESS_SECRET` (≥32)
+   - `JWT_REFRESH_SECRET` (≥32)
+   - `CORS_ORIGIN` = Vercel frontend URL
+   - `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` (seed için)
 
-1. **Root Directory:** boş bırak (repo kökü)
-2. **Builder:** Dockerfile
-3. API Dockerfile: `Dockerfile.api` (`railway.api.toml`)
-4. Web Dockerfile: `Dockerfile.web` (`railway.web.toml`)
-
-### API ortam değişkenleri
-
-- `DATABASE_URL` (Railway Postgres)
-- `JWT_ACCESS_SECRET` (min 32 karakter)
-- `JWT_REFRESH_SECRET` (min 32 karakter)
-- `CORS_ORIGIN` = frontend URL (örn. `https://web-xxx.up.railway.app`)
-- `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` (ilk seed için, opsiyonel)
-
-`PORT` Railway tarafından otomatik verilir.
-
-### Web build arg
-
-- `VITE_API_URL` = `https://api-xxx.up.railway.app/api`
-
-İlk deploy sonrası API’de seed:
-
-```bash
-railway run -s <api-service> npm run db:seed -w @woonwork/api
-```
+`PORT` Railway verir. Dockerfile gerekmez; istersen `Dockerfile.api` kullanılabilir.
 
 ## Vercel deploy (yalnız frontend)
 

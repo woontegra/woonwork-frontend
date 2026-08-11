@@ -1,0 +1,14 @@
+# apps/web and packages/* are part of npm workspaces; keep them for install.
+providers = ["node"]
+
+[variables]
+NIXPACKS_NODE_VERSION = "20"
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build:api"]
+
+[start]
+cmd = "cd apps/api && npx prisma db push && node dist/index.js"
