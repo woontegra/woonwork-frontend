@@ -71,3 +71,12 @@ Her iki servis için:
 ```bash
 railway run -s <api-service> npm run db:seed -w @woonwork/api
 ```
+
+## Vercel deploy (yalnız frontend)
+
+API Vercel’de derlenmez. Repo kökündeki `vercel.json` sadece web build çalıştırır.
+
+1. Root Directory: **boş** (repo kökü)
+2. Build: `npm run build:web`
+3. Output: `apps/web/dist`
+4. Env: `VITE_API_URL` = `https://<railway-api-url>/api`
