@@ -1,29 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bell, ChevronsUpDown, LogOut, Search } from 'lucide-react';
+import { Bell, LogOut, Plus, Search } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useTenant } from '../contexts/TenantContext';
 import { fullName } from '../lib/labels';
-import { MobileMenuButton } from './Sidebar';
+import { IconButton } from '../components/ui/Form';
+import { MobileMenuButton, useQuickCreateTargets } from './Sidebar';
 
 export function Topbar({
   title,
   onOpenMobile,
+  onOpenCommand,
+  canvasDimmed,
 }: {
   title: string;
   onOpenMobile: () => void;
+  onOpenCommand: () => void;
+  canvasDimmed?: boolean;
 }) {
   const { user, logout } = useAuth();
-  const { tenants, activeTenant, setActiveTenantId } = useTenant();
   const [userOpen, setUserOpen] = useState(false);
-  const [tenantOpen, setTenantOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const createTargets = useQuickCreateTargets();
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       if (!menuRef.current?.contains(e.target as Node)) {
         setUserOpen(false);
-        setTenantOpen(false);
+        setCreateOpen(false);
       }
     };
     document.addEventListener('mousedown', onClick);
@@ -31,111 +35,112 @@ export function Topbar({
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-navy-100/80 bg-cream/85 backdrop-blur-md">
-      <div className="flex items-center gap-4 px-4 py-3 lg:px-8">
+    <header
+      className={`sticky top-0 z-30 transition duration-[var(--ww-motion-normal)] ${
+        canvasDimmed ? 'brightness-[0.97]' : ''
+      }`}
+    >
+      <div className="flex items-center gap-3 px-4 py-3 lg:px-6">
         <MobileMenuButton onClick={onOpenMobile} />
 
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-semibold tracking-tight text-navy-900">{title}</h1>
-        </div>
-
-        <div className="hidden max-w-md flex-1 items-center gap-2 rounded-xl border border-navy-200 bg-white px-3 py-2 text-sm text-navy-400 md:flex">
-          <Search size={16} />
-          <input
-            className="w-full bg-transparent outline-none placeholder:text-navy-300"
-            placeholder="Ara... (yakında)"
-            disabled
-          />
-        </div>
+        {title ? (
+          <div className="min-w-0">
+            <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ww-text-muted)]">
+              Çalışma Alanı
+            </p>
+            <p className="truncate text-sm font-semibold tracking-tight text-[var(--ww-text)]">
+              {title}
+            </p>
+          </div>
+        ) : (
+          <div className="w-2 shrink-0" />
+        )}
 
         <button
           type="button"
-          className="rounded-xl p-2 text-navy-500 hover:bg-navy-50"
-          aria-label="Bildirimler"
-          title="Bildirimler"
+          onClick={onOpenCommand}
+          className="mx-auto hidden max-w-xl flex-1 items-center gap-3 rounded-[var(--ww-radius-md)] border border-[var(--ww-border-strong)] bg-white/80 px-3.5 py-2 text-left text-sm text-[var(--ww-text-muted)] shadow-[var(--ww-shadow-sm)] transition hover:border-accent/30 hover:shadow-[0_0_0_3px_var(--ww-accent-soft)] md:flex"
         >
-          <Bell size={18} />
+          <Search size={15} />
+          <span className="flex-1">Ara veya komut çalıştır...</span>
+          <kbd className="rounded border border-[var(--ww-border)] bg-ink-50 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ww-text-muted)]">
+            Ctrl K
+          </kbd>
         </button>
 
-        <div className="relative" ref={menuRef}>
-          <button
-            type="button"
-            onClick={() => {
-              setTenantOpen((v) => !v);
-              setUserOpen(false);
-            }}
-            className="hidden items-center gap-2 rounded-xl border border-navy-200 bg-white px-3 py-2 text-sm font-medium text-navy-800 hover:bg-navy-50 sm:flex"
-          >
-            <span className="max-w-[140px] truncate">{activeTenant?.name ?? 'Çalışma alanı'}</span>
-            <ChevronsUpDown size={14} className="text-navy-400" />
-          </button>
-
-          <AnimatePresence>
-            {tenantOpen ? (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-navy-100 bg-white shadow-xl"
-              >
-                {tenants.map((tenant) => (
-                  <button
-                    key={tenant.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveTenantId(tenant.id);
-                      setTenantOpen(false);
-                      window.location.reload();
-                    }}
-                    className={`block w-full px-3 py-2.5 text-left text-sm hover:bg-navy-50 ${
-                      tenant.id === activeTenant?.id ? 'bg-navy-50 font-semibold text-navy-900' : 'text-navy-700'
-                    }`}
-                  >
-                    {tenant.name}
-                  </button>
-                ))}
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-        </div>
-
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              setUserOpen((v) => !v);
-              setTenantOpen(false);
-            }}
-            className="flex items-center gap-2 rounded-xl border border-navy-200 bg-white px-2.5 py-1.5 hover:bg-navy-50"
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-navy-900 text-xs font-semibold text-white">
-              {(user?.firstName?.[0] || 'U').toUpperCase()}
-            </div>
-            <div className="hidden text-left sm:block">
-              <p className="text-sm font-semibold text-navy-900">{fullName(user)}</p>
-              <p className="text-[11px] text-navy-400">{user?.email}</p>
-            </div>
-          </button>
-
-          <AnimatePresence>
-            {userOpen ? (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-navy-100 bg-white shadow-xl"
-              >
-                <button
-                  type="button"
-                  onClick={() => void logout()}
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-rose-700 hover:bg-rose-50"
+        <div className="ml-auto flex items-center gap-1.5" ref={menuRef}>
+          <div className="relative">
+            <IconButton label="Hızlı oluştur" onClick={() => setCreateOpen((v) => !v)}>
+              <Plus size={18} />
+            </IconButton>
+            <AnimatePresence>
+              {createOpen ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                  transition={{ duration: 0.14 }}
+                  className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-[var(--ww-radius-md)] border border-[var(--ww-border)] bg-white p-1 shadow-[var(--ww-shadow-float)]"
                 >
-                  <LogOut size={16} />
-                  Çıkış Yap
-                </button>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+                  {createTargets.map((item, i) => (
+                    <motion.button
+                      key={item.label}
+                      type="button"
+                      initial={{ opacity: 0, x: 6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                      onClick={() => {
+                        item.onSelect();
+                        setCreateOpen(false);
+                      }}
+                      className="block w-full rounded-[6px] px-3 py-2 text-left text-sm text-[var(--ww-text)] hover:bg-accent-soft hover:text-accent-strong"
+                    >
+                      {item.label}
+                    </motion.button>
+                  ))}
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
+
+          <IconButton label="Bildirimler">
+            <Bell size={17} />
+          </IconButton>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setUserOpen((v) => !v)}
+              className="flex items-center gap-2 rounded-[var(--ww-radius-md)] px-1.5 py-1 hover:bg-black/[0.03]"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-ink-900 text-[11px] font-semibold text-white">
+                {(user?.firstName?.[0] || 'U').toUpperCase()}
+              </div>
+              <div className="hidden text-left sm:block">
+                <p className="text-sm font-semibold text-[var(--ww-text)]">{fullName(user)}</p>
+              </div>
+            </button>
+
+            <AnimatePresence>
+              {userOpen ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-[var(--ww-radius-md)] border border-[var(--ww-border)] bg-white shadow-[var(--ww-shadow-float)]"
+                >
+                  <button
+                    type="button"
+                    onClick={() => void logout()}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-danger hover:bg-danger-soft"
+                  >
+                    <LogOut size={15} />
+                    Çıkış Yap
+                  </button>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </header>

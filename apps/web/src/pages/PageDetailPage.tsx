@@ -1,17 +1,25 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Plus, Trash2 } from 'lucide-react';
+import { ImagePlus, MoreHorizontal, Trash2 } from 'lucide-react';
 import { apiRequest } from '../lib/api';
 import type { PageDto } from '../types';
 import { useTenant } from '../contexts/TenantContext';
 import { useToast } from '../components/ui/Toast';
-import { EmptyState, Skeleton } from '../components/ui/PageLoader';
-import { Button, Input } from '../components/ui/Form';
-import { Modal } from '../components/ui/Modal';
+import { EmptyState, PageCanvas, Skeleton } from '../components/ui/PageLoader';
+import { Button } from '../components/ui/Form';
 import { BlockEditor } from '../components/editor/BlockEditor';
 import type { SaveStatus } from '../components/editor/types';
+import { ContentAccessActions } from '../components/library/ContentAccessActions';
+import { MediaPickerModal } from '../components/media/MediaPickerModal';
+import {
+  deletePage,
+  duplicatePage,
+  notifyWorkspaceChanged,
+  updatePage,
+} from '../lib/workspace';
+import { addFavorite, listFavorites, removeFavorite } from '../lib/library';
 
-const PAGE_ICONS = ['📄', '📝', '📘', '📌', '💡', '🎯', '🗂️', '✨'] as const;
+const PAGE_ICONS = ['📄', '📝', '📘', '📌', '💡', '🎯', '🗂️', '✨', '🧠', '📅', '🧪', '🏠'] as const;
 
 export function PageDetailPage() {
   const { id } = useParams();
@@ -22,9 +30,10 @@ export function PageDetailPage() {
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
-  const [childModal, setChildModal] = useState(false);
-  const [childTitle, setChildTitle] = useState('');
   const [iconMenu, setIconMenu] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [coverOpen, setCoverOpen] = useState(false);
+  const [favorited, setFavorited] = useState(false);
 
   async function load() {
     if (!activeTenant || !id) return;
@@ -45,204 +54,278 @@ export function PageDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTenant, id]);
 
+  useEffect(() => {
+    if (!id) return;
+    void listFavorites(50)
+      .then((items) => setFavorited(items.some((f) => f.resourceType === 'PAGE' && f.resourceId === id)))
+      .catch(() => setFavorited(false));
+  }, [id]);
+
   async function saveTitle() {
     if (!page || title === page.title) return;
     setSaveStatus('saving');
     try {
-      const updated = await apiRequest<PageDto>(`/pages/${page.id}`, {
-        method: 'PATCH',
-        body: { title },
-      });
-      setPage(updated);
+      const updated = await updatePage(page.id, { title });
+      setPage((p) => (p ? { ...p, ...updated, ancestors: p.ancestors } : updated));
       setSaveStatus('saved');
+      notifyWorkspaceChanged();
     } catch (err) {
       setSaveStatus('error');
       toast((err as Error).message || 'Başlık kaydedilemedi', 'error');
     }
   }
 
-  async function saveIcon(icon: string) {
+  async function saveIcon(icon: string | null) {
     if (!page) return;
     setIconMenu(false);
-    setSaveStatus('saving');
     try {
-      const updated = await apiRequest<PageDto>(`/pages/${page.id}`, {
-        method: 'PATCH',
-        body: { icon },
-      });
-      setPage(updated);
-      setSaveStatus('saved');
+      const updated = await updatePage(page.id, { icon });
+      setPage((p) => (p ? { ...p, icon: updated.icon } : updated));
+      notifyWorkspaceChanged();
     } catch (err) {
-      setSaveStatus('error');
       toast((err as Error).message || 'İkon kaydedilemedi', 'error');
     }
   }
 
-  async function createChild(e: FormEvent) {
-    e.preventDefault();
+  async function saveCover(url: string | null) {
     if (!page) return;
     try {
-      const created = await apiRequest<PageDto>('/pages', {
-        method: 'POST',
-        body: { title: childTitle, parentId: page.id },
-      });
-      toast('Alt sayfa oluşturuldu', 'success');
-      setChildModal(false);
-      setChildTitle('');
-      navigate(`/notlar/${created.id}`);
+      const updated = await updatePage(page.id, { coverUrl: url });
+      setPage((p) => (p ? { ...p, coverUrl: updated.coverUrl } : updated));
     } catch (err) {
-      toast((err as Error).message || 'Alt sayfa oluşturulamadı', 'error');
+      toast((err as Error).message || 'Kapak güncellenemedi', 'error');
     }
   }
 
-  async function removePage() {
+  async function toggleFavorite() {
+    if (!page) return;
+    try {
+      if (favorited) {
+        await removeFavorite('PAGE', page.id);
+        setFavorited(false);
+      } else {
+        await addFavorite('PAGE', page.id);
+        setFavorited(true);
+      }
+      notifyWorkspaceChanged();
+    } catch (err) {
+      toast((err as Error).message || 'Favori güncellenemedi', 'error');
+    }
+  }
+
+  async function onDuplicate() {
+    if (!page) return;
+    try {
+      const copy = await duplicatePage(page.id);
+      notifyWorkspaceChanged();
+      navigate(`/notlar/${copy.id}`);
+    } catch (err) {
+      toast((err as Error).message || 'Çoğaltılamadı', 'error');
+    }
+  }
+
+  async function remove() {
     if (!page) return;
     if (!window.confirm(`“${page.title}” sayfasını silmek istiyor musunuz?`)) return;
     try {
-      await apiRequest(`/pages/${page.id}`, { method: 'DELETE' });
+      await deletePage(page.id);
+      notifyWorkspaceChanged();
       toast('Sayfa silindi', 'success');
-      navigate('/notlar');
+      navigate('/');
     } catch (err) {
       toast((err as Error).message || 'Silinemedi', 'error');
     }
   }
 
-  const statusLabel =
-    saveStatus === 'saving'
-      ? 'Kaydediliyor...'
-      : saveStatus === 'saved'
-        ? 'Kaydedildi'
-        : saveStatus === 'error'
-          ? 'Kaydetme hatası'
-          : '';
-
-  if (loading) return <Skeleton className="h-80" />;
+  if (loading) {
+    return (
+      <PageCanvas mode="EDITOR_FOCUS">
+        <Skeleton className="h-80 w-full" />
+      </PageCanvas>
+    );
+  }
   if (!page) {
     return (
-      <EmptyState
-        title="Sayfa bulunamadı"
-        action={
-          <Link to="/notlar" className="text-sm font-medium text-accent hover:underline">
-            Notlara dön
-          </Link>
-        }
-      />
+      <PageCanvas mode="EDITOR_FOCUS">
+        <EmptyState
+          title="Sayfa bulunamadı"
+          action={
+            <Link to="/kutuphane" className="text-sm font-medium text-accent hover:underline">
+              Kütüphaneye dön
+            </Link>
+          }
+        />
+      </PageCanvas>
     );
   }
 
+  const crumbs = [
+    page.workspaceArea
+      ? { to: `/alanlar/${page.workspaceArea.id}`, label: page.workspaceArea.name }
+      : { to: '/kutuphane?view=private', label: 'Özel' },
+    ...(page.ancestors ?? []).map((a) => ({ to: `/notlar/${a.id}`, label: a.title })),
+  ];
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav className="flex min-w-0 items-center gap-2 text-sm text-navy-500">
-          <Link to="/notlar" className="hover:text-navy-800">
-            Notlar & Belgeler
-          </Link>
-          {page.parent ? (
-            <>
-              <span>/</span>
-              <Link to={`/notlar/${page.parent.id}`} className="truncate hover:text-navy-800">
-                {page.parent.icon ? `${page.parent.icon} ` : ''}
-                {page.parent.title}
+    <PageCanvas mode="EDITOR_FOCUS">
+      <div className="flex items-center justify-between gap-3">
+        <nav className="flex min-w-0 flex-wrap items-center gap-1.5 text-[12px] text-[var(--ww-text-muted)]">
+          {crumbs.map((c, i) => (
+            <span key={c.to} className="inline-flex min-w-0 items-center gap-1.5">
+              {i > 0 ? <span>/</span> : null}
+              <Link to={c.to} className="truncate hover:text-[var(--ww-text)]">
+                {c.label}
               </Link>
-            </>
-          ) : null}
-          <span>/</span>
-          <span className="truncate font-medium text-navy-800">{title || 'Adsız'}</span>
-        </nav>
-
-        <div className="flex items-center gap-3">
-          {statusLabel ? (
-            <span
-              className={`text-xs ${
-                saveStatus === 'error' ? 'text-rose-600' : 'text-navy-400'
-              }`}
-            >
-              {statusLabel}
             </span>
+          ))}
+        </nav>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {saveStatus === 'saving' ? (
+            <span className="text-[11px] text-[var(--ww-text-muted)]">Kaydediliyor…</span>
           ) : null}
-          <Button variant="secondary" onClick={() => setChildModal(true)}>
-            <Plus size={16} />
-            Alt Sayfa
-          </Button>
-          <Button variant="danger" onClick={() => void removePage()}>
-            <Trash2 size={16} />
-            Sil
-          </Button>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-navy-100 bg-white px-6 py-8 lg:px-12 lg:py-10">
-        <div className="relative mb-3 inline-block">
-          <button
-            type="button"
-            className="rounded-xl px-1 text-4xl hover:bg-navy-50"
-            onClick={() => setIconMenu((v) => !v)}
-            title="İkon değiştir"
-          >
-            {page.icon || '📄'}
-          </button>
-          {iconMenu ? (
-            <div className="absolute left-0 top-12 z-20 grid grid-cols-4 gap-1 rounded-xl border border-navy-100 bg-white p-2 shadow-xl">
-              {PAGE_ICONS.map((icon) => (
-                <button
-                  key={icon}
-                  type="button"
-                  className="rounded-lg p-2 text-lg hover:bg-navy-50"
-                  onClick={() => void saveIcon(icon)}
-                >
-                  {icon}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => void saveTitle()}
-          placeholder="Adsız sayfa"
-          className="mb-8 w-full border-0 bg-transparent text-4xl font-semibold tracking-tight text-navy-950 outline-none placeholder:text-navy-300"
-        />
-
-        {id ? <BlockEditor pageId={id} onSaveStatusChange={setSaveStatus} /> : null}
-      </div>
-
-      {page.children && page.children.length > 0 ? (
-        <section className="rounded-2xl border border-navy-100 bg-white p-5">
-          <h2 className="mb-3 text-sm font-semibold text-navy-900">Alt sayfalar</h2>
-          <ul className="divide-y divide-navy-50">
-            {page.children.map((child) => (
-              <li key={child.id}>
-                <Link
-                  to={`/notlar/${child.id}`}
-                  className="flex items-center gap-3 px-1 py-3 text-sm hover:bg-navy-50/60"
-                >
-                  <span>{child.icon || '📄'}</span>
-                  <span className="font-medium text-navy-800">{child.title}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <Modal open={childModal} onClose={() => setChildModal(false)} title="Alt Sayfa Oluştur">
-        <form onSubmit={createChild} className="space-y-4">
-          <Input
-            label="Başlık"
-            required
-            value={childTitle}
-            onChange={(e) => setChildTitle(e.target.value)}
+          <ContentAccessActions
+            resourceType="PAGE"
+            resourceId={page.id}
+            areaId={page.workspaceAreaId}
+            areaName={page.workspaceArea?.name}
+            onMoved={() => {
+              notifyWorkspaceChanged();
+              void load();
+            }}
           />
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setChildModal(false)}>
-              Vazgeç
+          <div className="relative">
+            <Button size="sm" variant="ghost" onClick={() => setMoreOpen((v) => !v)}>
+              <MoreHorizontal size={16} />
             </Button>
-            <Button type="submit">Oluştur</Button>
+            {moreOpen ? (
+              <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden border border-[var(--ww-border)] bg-white py-1 text-[13px] shadow-[var(--ww-shadow-sm)]">
+                <button
+                  type="button"
+                  className="block w-full px-3 py-1.5 text-left hover:bg-ink-50"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    document.querySelector<HTMLInputElement>('[data-page-title]')?.focus();
+                  }}
+                >
+                  Yeniden Adlandır
+                </button>
+                <button
+                  type="button"
+                  className="block w-full px-3 py-1.5 text-left hover:bg-ink-50"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    void toggleFavorite();
+                  }}
+                >
+                  {favorited ? 'Favoriden çıkar' : 'Favoriye Ekle'}
+                </button>
+                <button
+                  type="button"
+                  className="block w-full px-3 py-1.5 text-left hover:bg-ink-50"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    void onDuplicate();
+                  }}
+                >
+                  Çoğalt
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-danger hover:bg-ink-50"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    void remove();
+                  }}
+                >
+                  <Trash2 size={13} />
+                  Sil
+                </button>
+              </div>
+            ) : null}
           </div>
-        </form>
-      </Modal>
-    </div>
+        </div>
+      </div>
+
+      <div className="overflow-hidden border border-[var(--ww-border)] bg-white">
+        {page.coverUrl ? (
+          <div className="group relative h-40 overflow-hidden bg-ink-50">
+            <img src={page.coverUrl} alt="" className="h-full w-full object-cover" />
+            <div className="absolute right-3 top-3 hidden gap-1 group-hover:flex">
+              <Button size="sm" variant="secondary" onClick={() => setCoverOpen(true)}>
+                Kapak değiştir
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => void saveCover(null)}>
+                Kaldır
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="px-6 pt-3 lg:px-10">
+            <button
+              type="button"
+              className="inline-flex h-7 items-center gap-1.5 text-[12px] text-[var(--ww-text-muted)] hover:text-[var(--ww-text)]"
+              onClick={() => setCoverOpen(true)}
+            >
+              <ImagePlus size={13} />
+              Kapak Ekle
+            </button>
+          </div>
+        )}
+
+        <div className="px-6 pb-10 pt-4 lg:px-10 lg:pt-6">
+          <div className="relative mb-2 inline-block">
+            <button
+              type="button"
+              className="rounded-md px-1 text-4xl hover:bg-ink-50"
+              onClick={() => setIconMenu((v) => !v)}
+              title="İkon"
+            >
+              {page.icon || '📄'}
+            </button>
+            {iconMenu ? (
+              <div className="absolute left-0 top-12 z-20 grid grid-cols-6 gap-1 border border-[var(--ww-border)] bg-white p-2 shadow-[var(--ww-shadow-sm)]">
+                <button
+                  type="button"
+                  className="rounded p-1 text-[12px] text-[var(--ww-text-muted)] hover:bg-ink-50"
+                  onClick={() => void saveIcon(null)}
+                >
+                  Yok
+                </button>
+                {PAGE_ICONS.map((icon) => (
+                  <button
+                    key={icon}
+                    type="button"
+                    className="rounded p-1 text-lg hover:bg-ink-50"
+                    onClick={() => void saveIcon(icon)}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <input
+            data-page-title
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => void saveTitle()}
+            placeholder="Adsız sayfa"
+            className="mb-8 w-full border-0 bg-transparent text-[2rem] font-semibold tracking-tight text-[var(--ww-text)] outline-none placeholder:text-[var(--ww-text-muted)]"
+          />
+          {id ? <BlockEditor pageId={id} onSaveStatusChange={setSaveStatus} /> : null}
+        </div>
+      </div>
+
+      <MediaPickerModal
+        open={coverOpen}
+        onClose={() => setCoverOpen(false)}
+        title="Kapak görseli"
+        allowedCategories={['IMAGE']}
+        onSelect={(asset) => {
+          if (asset.url) void saveCover(asset.url);
+          setCoverOpen(false);
+        }}
+      />
+    </PageCanvas>
   );
 }

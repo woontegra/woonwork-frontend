@@ -1,183 +1,180 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { CalendarClock, FileText, FolderKanban, SquareCheckBig } from 'lucide-react';
 import { apiRequest } from '../lib/api';
 import type { DashboardDto } from '../types';
-import { EmptyState, Skeleton } from '../components/ui/PageLoader';
-import { Badge } from '../components/ui/Form';
-import { formatDate, fullName, projectStatusLabels, taskPriorityLabels } from '../lib/labels';
+import { PageCanvas, PageHeader, Skeleton } from '../components/ui/PageLoader';
+import { formatDate, taskPriorityLabels } from '../lib/labels';
 import { useTenant } from '../contexts/TenantContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast';
+import { listFavorites, listRecents, listAreas, type FavoriteDto, type RecentDto, type WorkspaceAreaDto } from '../lib/library';
+import { resourceHref } from '../lib/library';
 
 export function DashboardPage() {
   const { activeTenant } = useTenant();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [data, setData] = useState<DashboardDto | null>(null);
+  const [favorites, setFavorites] = useState<FavoriteDto[]>([]);
+  const [recents, setRecents] = useState<RecentDto[]>([]);
+  const [areas, setAreas] = useState<WorkspaceAreaDto[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!activeTenant) return;
-    let cancelled = false;
     setLoading(true);
-    apiRequest<DashboardDto>('/dashboard')
-      .then((res) => {
-        if (!cancelled) setData(res);
+    void Promise.all([
+      apiRequest<DashboardDto>('/dashboard'),
+      listFavorites(8),
+      listRecents(8),
+      listAreas(),
+    ])
+      .then(([dash, favs, rec, ar]) => {
+        setData(dash);
+        setFavorites(favs);
+        setRecents(rec);
+        setAreas(ar);
       })
-      .catch((err) => toast(err.message || 'Dashboard yüklenemedi', 'error'))
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .catch((err) => toast((err as Error).message || 'Yüklenemedi', 'error'))
+      .finally(() => setLoading(false));
   }, [activeTenant, toast]);
 
-  const cards = [
-    {
-      label: 'Aktif Projeler',
-      value: data?.stats.activeProjects ?? 0,
-      icon: FolderKanban,
-    },
-    {
-      label: 'Bekleyen Görevler',
-      value: data?.stats.pendingTasks ?? 0,
-      icon: SquareCheckBig,
-    },
-    {
-      label: 'Bugün Biten İşler',
-      value: data?.stats.dueToday ?? 0,
-      icon: CalendarClock,
-    },
-    {
-      label: 'Son Sayfalar',
-      value: data?.stats.recentPages ?? 0,
-      icon: FileText,
-    },
-  ];
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Günaydın';
+    if (hour < 18) return 'İyi günler';
+    return 'İyi akşamlar';
+  }, []);
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
-        </div>
-        <Skeleton className="h-64" />
-      </div>
+      <PageCanvas mode="WORKSPACE_WIDE">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-64 w-full" />
+      </PageCanvas>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map((card, index) => {
-          const Icon = card.icon;
-          return (
-            <motion.div
-              key={card.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              whileHover={{ y: -2 }}
-              className="rounded-2xl border border-navy-100 bg-white p-5 shadow-sm shadow-navy-900/[0.03]"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-navy-500">{card.label}</p>
-                  <p className="mt-2 text-3xl font-semibold tracking-tight text-navy-950">{card.value}</p>
-                </div>
-                <div className="rounded-xl bg-navy-50 p-2.5 text-navy-700">
-                  <Icon size={18} />
-                </div>
+    <PageCanvas mode="WORKSPACE_WIDE">
+      <PageHeader
+        title={`${greeting}, ${user?.firstName || 'ekip'}`}
+        description="Çalışma alanınıza devam edin."
+      />
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
+        <div className="space-y-4">
+          <section>
+            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ww-text-muted)]">
+              Son çalışmalar
+            </h2>
+            {!recents.length && !data?.recentPages.length ? (
+              <p className="text-sm text-[var(--ww-text-muted)]">Henüz son çalışma yok.</p>
+            ) : (
+              <div className="divide-y divide-[var(--ww-border)] border border-[var(--ww-border)] bg-white">
+                {(recents.length
+                  ? recents.map((item) => ({
+                      id: item.resourceId,
+                      href: item.href,
+                      name: item.name,
+                      icon: item.icon,
+                    }))
+                  : (data?.recentPages ?? []).map((p) => ({
+                      id: p.id,
+                      href: `/notlar/${p.id}`,
+                      name: p.title,
+                      icon: p.icon,
+                    }))
+                ).map((item) => (
+                  <Link
+                    key={item.id}
+                    to={item.href}
+                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-ink-50/60"
+                  >
+                    <span className="w-5 text-center text-[13px]">{item.icon || '·'}</span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{item.name}</span>
+                  </Link>
+                ))}
               </div>
-            </motion.div>
-          );
-        })}
-      </div>
+            )}
+          </section>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <section className="rounded-2xl border border-navy-100 bg-white p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-navy-900">Son Projeler</h2>
-            <Link to="/projeler" className="text-xs font-medium text-accent hover:underline">
-              Tümünü gör
-            </Link>
-          </div>
-          {!data?.recentProjects.length ? (
-            <EmptyState title="Henüz proje yok" description="İlk projenizi oluşturarak başlayın." />
-          ) : (
-            <ul className="divide-y divide-navy-100">
-              {data.recentProjects.map((project) => (
-                <li key={project.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-navy-900">{project.name}</p>
-                    <p className="text-xs text-navy-400">
-                      {project._count?.tasks ?? 0} görev · {fullName(project.createdBy)}
-                    </p>
-                  </div>
-                  <Badge tone="blue">{projectStatusLabels[project.status] ?? project.status}</Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-navy-100 bg-white p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-navy-900">Yaklaşan Görevler</h2>
-            <Link to="/gorevler" className="text-xs font-medium text-accent hover:underline">
-              Tümünü gör
-            </Link>
-          </div>
-          {!data?.upcomingTasks.length ? (
-            <EmptyState title="Yaklaşan görev yok" description="Son tarihi olan görevler burada listelenir." />
-          ) : (
-            <ul className="divide-y divide-navy-100">
-              {data.upcomingTasks.map((task) => (
-                <li key={task.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-navy-900">{task.title}</p>
-                    <p className="text-xs text-navy-400">
-                      {task.project?.name ?? 'Projesiz'} · {formatDate(task.dueDate)}
-                    </p>
-                  </div>
-                  <Badge tone={task.priority === 'URGENT' || task.priority === 'HIGH' ? 'rose' : 'neutral'}>
-                    {taskPriorityLabels[task.priority] ?? task.priority}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-
-      <section className="rounded-2xl border border-navy-100 bg-white p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-navy-900">Son Sayfalar</h2>
-          <Link to="/notlar" className="text-xs font-medium text-accent hover:underline">
-            Tümünü gör
-          </Link>
+          <section>
+            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ww-text-muted)]">
+              Bugünkü işler
+            </h2>
+            {!data?.upcomingTasks.length ? (
+              <p className="text-sm text-[var(--ww-text-muted)]">Yaklaşan görev yok.</p>
+            ) : (
+              <div className="divide-y divide-[var(--ww-border)] border border-[var(--ww-border)] bg-white">
+                {data.upcomingTasks.map((task) => (
+                  <Link
+                    key={task.id}
+                    to="/gorevler"
+                    className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-ink-50/60"
+                  >
+                    <span>
+                      <span className="block text-[13px] font-medium">{task.title}</span>
+                      <span className="text-[11px] text-[var(--ww-text-muted)]">
+                        {task.project?.name ?? 'Projesiz'} · {formatDate(task.dueDate)}
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-[var(--ww-text-muted)]">
+                      {taskPriorityLabels[task.priority] ?? task.priority}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
-        {!data?.recentPages.length ? (
-          <EmptyState title="Henüz sayfa yok" description="Notlar & belgeler bölümünden sayfa ekleyebilirsiniz." />
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {data.recentPages.map((page) => (
-              <Link
-                key={page.id}
-                to={`/notlar/${page.id}`}
-                className="rounded-xl border border-navy-100 px-3 py-3 transition hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-sm"
-              >
-                <p className="text-lg">{page.icon || '📄'}</p>
-                <p className="mt-1 truncate text-sm font-medium text-navy-900">{page.title}</p>
-                <p className="text-xs text-navy-400">{formatDate(page.updatedAt)}</p>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
+
+        <div className="space-y-4">
+          <section>
+            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ww-text-muted)]">
+              Favoriler
+            </h2>
+            {!favorites.length ? (
+              <p className="text-sm text-[var(--ww-text-muted)]">Favori yok.</p>
+            ) : (
+              <div className="divide-y divide-[var(--ww-border)] border border-[var(--ww-border)] bg-white">
+                {favorites.map((fav) => (
+                  <Link
+                    key={fav.id}
+                    to={fav.href || resourceHref(fav.resourceType, fav.resourceId)}
+                    className="flex items-center gap-2 px-3 py-2.5 text-[13px] hover:bg-ink-50/60"
+                  >
+                    <span>{fav.icon || '·'}</span>
+                    <span className="truncate font-medium">{fav.name}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ww-text-muted)]">
+              Alanlar
+            </h2>
+            {!areas.length ? (
+              <p className="text-sm text-[var(--ww-text-muted)]">Henüz alan yok.</p>
+            ) : (
+              <div className="divide-y divide-[var(--ww-border)] border border-[var(--ww-border)] bg-white">
+                {areas.map((area) => (
+                  <Link
+                    key={area.id}
+                    to={`/alanlar/${area.id}`}
+                    className="flex items-center gap-2 px-3 py-2.5 text-[13px] hover:bg-ink-50/60"
+                  >
+                    <span>{area.icon || '·'}</span>
+                    <span className="truncate font-medium">{area.name}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </PageCanvas>
   );
 }

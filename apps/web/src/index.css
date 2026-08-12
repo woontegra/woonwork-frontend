@@ -1,22 +1,107 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy-950: #0b1220;
-  --color-navy-900: #111b2e;
-  --color-navy-800: #1a2740;
-  --color-navy-700: #243552;
-  --color-navy-600: #334766;
-  --color-navy-500: #4a6185;
-  --color-navy-400: #6b82a6;
-  --color-navy-300: #97a9c4;
-  --color-navy-200: #c5d0e0;
-  --color-navy-100: #e4eaf2;
-  --color-navy-50: #f3f6fa;
-  --color-cream: #f7f8fb;
-  --color-accent: #2f6fed;
-  --color-accent-soft: #e8f0ff;
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Instrument Serif", Georgia, serif;
+  /* Ink / navigation shell */
+  --color-ink-950: #060d18;
+  --color-ink-900: #0a1424;
+  --color-ink-800: #101b2d;
+  --color-ink-700: #18253a;
+  --color-ink-600: #243450;
+  --color-ink-500: #3a4f6e;
+  --color-ink-400: #6b7f9c;
+  --color-ink-300: #9aabc2;
+  --color-ink-200: #c8d2e0;
+  --color-ink-100: #e6ebf2;
+  --color-ink-50: #f2f5f9;
+
+  /* Backward-compatible aliases (migrating navy → ink) */
+  --color-navy-950: #060d18;
+  --color-navy-900: #0a1424;
+  --color-navy-800: #101b2d;
+  --color-navy-700: #18253a;
+  --color-navy-600: #243450;
+  --color-navy-500: #3a4f6e;
+  --color-navy-400: #6b7f9c;
+  --color-navy-300: #9aabc2;
+  --color-navy-200: #c8d2e0;
+  --color-navy-100: #e6ebf2;
+  --color-navy-50: #f2f5f9;
+
+  /* Workspace canvas */
+  --color-canvas: #f4f6f8;
+  --color-cream: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #eef1f5;
+
+  /* Accent — electric indigo (interaction only) */
+  --color-accent: #4361ee;
+  --color-accent-soft: #e9edff;
+  --color-accent-strong: #2f4fd6;
+
+  /* Semantic */
+  --color-success: #1f9d63;
+  --color-success-soft: #e6f7ef;
+  --color-warning: #c98512;
+  --color-warning-soft: #fff4df;
+  --color-danger: #d6455d;
+  --color-danger-soft: #fdecef;
+  --color-info: #2f7bbf;
+  --color-info-soft: #e7f2fb;
+
+  --font-sans: "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Segoe UI Semibold", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-data: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --control-h: 32px;
+  --control-h-sm: 30px;
+  --control-radius: 6px;
+  --row-h: 36px;
+  --shadow-sm: 0 1px 2px rgb(6 13 24 / 0.04);
+  --shadow-float: 0 8px 28px rgb(6 13 24 / 0.1);
+  --shadow-overlay: 0 18px 48px rgb(6 13 24 / 0.16);
+  --ease-ww: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-fast: 140ms;
+  --motion-normal: 200ms;
+  --motion-page: 280ms;
+}
+
+:root {
+  --ww-bg: var(--color-ink-950);
+  --ww-canvas: var(--color-canvas);
+  --ww-surface: var(--color-surface);
+  --ww-surface-raised: var(--color-surface-raised);
+  --ww-surface-hover: var(--color-surface-muted);
+  --ww-border: rgb(10 20 36 / 0.08);
+  --ww-border-strong: rgb(10 20 36 / 0.14);
+  --ww-text: #0a1424;
+  --ww-text-secondary: #3a4f6e;
+  --ww-text-muted: #6b7f9c;
+  --ww-accent: var(--color-accent);
+  --ww-accent-soft: var(--color-accent-soft);
+  --ww-danger: var(--color-danger);
+  --ww-success: var(--color-success);
+  --ww-radius-sm: var(--radius-sm);
+  --ww-radius-md: var(--radius-md);
+  --ww-radius-lg: var(--radius-lg);
+  --ww-control-h: var(--control-h);
+  --ww-control-h-sm: var(--control-h-sm);
+  --ww-control-radius: var(--control-radius);
+  --ww-row-h: var(--row-h);
+  --ww-table-rule: rgb(10 20 36 / 0.055);
+  --ww-shadow-sm: var(--shadow-sm);
+  --ww-shadow-float: var(--shadow-float);
+  --ww-shadow-overlay: var(--shadow-overlay);
+  --ww-motion-fast: var(--motion-fast);
+  --ww-motion-normal: var(--motion-normal);
+  --ww-ease: var(--ease-ww);
+  --ww-page-pad-x: 1.75rem;
+  --ww-page-pad-x-lg: 2.25rem;
+  --ww-page-gap: 0.75rem;
+  --ww-page-gap-lg: 1rem;
 }
 
 * {
@@ -32,24 +117,548 @@ body,
 body {
   margin: 0;
   font-family: var(--font-sans);
-  color: var(--color-navy-900);
-  background: var(--color-cream);
+  color: var(--ww-text);
+  background: var(--ww-canvas);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
 input,
 select,
 textarea {
-  font: inherit;
+  font-family: inherit;
+  font-feature-settings: inherit;
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-navy-200);
+  background: rgb(10 20 36 / 0.14);
   border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(10 20 36 / 0.22);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* Desk atmosphere — subtle, not decorative wallpaper */
+.ww-canvas {
+  position: relative;
+  background:
+    radial-gradient(1200px 600px at 12% -10%, rgb(67 97 238 / 0.05), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgb(10 20 36 / 0.03), transparent 50%),
+    var(--ww-canvas);
+}
+
+.ww-canvas::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+  z-index: 0;
+}
+
+.ww-canvas > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ww-surface {
+  background: var(--ww-surface);
+  border: 1px solid var(--ww-border);
+}
+
+.ww-surface-quiet {
+  background: rgb(255 255 255 / 0.72);
+  border: 1px solid var(--ww-border);
+}
+
+.ww-rail {
+  box-shadow: inset 3px 0 0 0 var(--ww-accent);
+}
+
+.ww-focus-ring:focus-visible {
+  outline: 2px solid var(--ww-accent);
+  outline-offset: 2px;
+}
+
+.ww-data {
+  font-family: var(--font-data);
+  font-feature-settings: "tnum" 1;
+}
+
+.ww-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: left;
+}
+
+.ww-table thead th {
+  height: 32px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--ww-text-muted);
+  background: rgb(248 249 251 / 0.94);
+  border-bottom: 1px solid var(--ww-border);
+  vertical-align: middle;
+}
+
+.ww-table tbody td {
+  height: var(--ww-row-h);
+  padding: 0 8px;
+  border-bottom: 1px solid var(--ww-table-rule);
+  vertical-align: middle;
+}
+
+.ww-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ww-table tbody tr:hover {
+  background: rgb(10 20 36 / 0.022);
+}
+
+/* Social module controls — same stack as table secondary body (12px / 400 / 1.25). */
+.ww-social-field,
+.ww-social-btn {
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.25;
+  letter-spacing: 0;
+  box-sizing: border-box;
+}
+
+.ww-social-field {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--ww-border);
+  border-radius: var(--ww-control-radius);
+  background: #fff;
+  color: var(--ww-text);
+  font-weight: 400;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.ww-social-field.ww-social-toolbar {
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 5px;
+}
+
+.ww-social-field:hover {
+  border-color: var(--ww-border-strong);
+}
+
+.ww-social-field:focus,
+.ww-social-field:focus-visible {
+  outline: none;
+  border-color: rgb(67 97 238 / 0.4);
+  box-shadow: 0 0 0 2px rgb(67 97 238 / 0.1);
+}
+
+.ww-social-field::placeholder {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: var(--color-ink-300);
+}
+
+.ww-social-field::-webkit-datetime-edit,
+.ww-social-field::-webkit-datetime-edit-fields-wrapper,
+.ww-social-field::-webkit-datetime-edit-text,
+.ww-social-field::-webkit-datetime-edit-month-field,
+.ww-social-field::-webkit-datetime-edit-day-field,
+.ww-social-field::-webkit-datetime-edit-year-field,
+.ww-social-field::-webkit-datetime-edit-hour-field,
+.ww-social-field::-webkit-datetime-edit-minute-field,
+.ww-social-field::-webkit-datetime-edit-second-field,
+.ww-social-field::-webkit-datetime-edit-ampm-field {
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0 !important;
+  padding: 0;
+}
+
+.ww-social-field::-webkit-calendar-picker-indicator {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0.4;
+}
+
+.ww-social-field:hover::-webkit-calendar-picker-indicator {
+  opacity: 0.65;
+}
+
+.ww-social-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 10px;
+  gap: 4px;
+  border-radius: var(--ww-control-radius);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ww-social-btn.ww-social-toolbar,
+.ww-social-btn.ww-social-sm {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 5px;
+}
+
+.ww-social-btn.ww-social-icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.ww-social-textarea {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
+/* İçerikler ops screen — toolbar + table as one quiet workspace (not a form bar). */
+.ww-contents-canvas {
+  gap: 0.35rem;
+}
+
+.ww-contents-tabs {
+  min-height: 28px;
+  gap: 2px;
+}
+
+.ww-contents-tabs a {
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 5px;
+}
+
+.ww-contents-ops {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ww-contents-shell {
+  overflow: hidden;
+  border: 1px solid var(--ww-border);
+  background: #fff;
+}
+
+.ww-contents-ops .ww-contents-toolbar {
+  gap: 6px;
+  min-height: 42px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ww-table-rule);
+  background: #fff;
+}
+
+.ww-contents-ops .ww-contents-toolbar .ww-social-field {
+  height: 30px;
+  padding: 0 22px 0 9px;
+  border: 1px solid var(--ww-border);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: none;
+  color: var(--ww-text);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.ww-contents-ops .ww-contents-toolbar .ww-social-field:hover {
+  background: #fff;
+  border-color: var(--ww-border-strong);
+}
+
+.ww-contents-ops .ww-contents-toolbar .ww-social-field:focus,
+.ww-contents-ops .ww-contents-toolbar .ww-social-field:focus-visible,
+.ww-contents-ops .ww-contents-toolbar button.ww-social-field[aria-expanded='true'] {
+  background: #fff;
+  border-color: rgb(67 97 238 / 0.4);
+  box-shadow: 0 0 0 2px rgb(67 97 238 / 0.1);
+  color: var(--ww-text);
+}
+
+.ww-contents-ops .ww-contents-search {
+  flex: 1 1 280px;
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.ww-contents-ops .ww-contents-search .ww-social-field {
+  height: 30px;
+  padding: 0 9px 0 28px;
+  background: #fff;
+  border: 1px solid var(--ww-border);
+  border-radius: 6px;
+  color: var(--ww-text);
+}
+
+.ww-contents-ops .ww-contents-search .ww-social-field:hover {
+  border-color: var(--ww-border-strong);
+  box-shadow: none;
+}
+
+.ww-contents-ops .ww-contents-search .ww-social-field:focus,
+.ww-contents-ops .ww-contents-search .ww-social-field:focus-visible {
+  border-color: rgb(67 97 238 / 0.4);
+  box-shadow: 0 0 0 2px rgb(67 97 238 / 0.1);
+}
+
+.ww-contents-ops .ww-contents-toolbar input[type='date'] {
+  width: 124px;
+  flex-shrink: 0;
+  padding: 0 8px;
+}
+
+.ww-contents-ops .ww-contents-new {
+  height: 30px;
+  padding: 0 11px;
+  gap: 4px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+  box-shadow: none;
+  background: var(--color-accent);
+}
+
+.ww-contents-ops .ww-contents-new:hover {
+  background: var(--color-accent-strong);
+  filter: none;
+}
+
+.ww-contents-ops .ww-table thead th {
+  height: 28px;
+  padding: 0 6px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ww-text-muted);
+  border-bottom: 1px solid var(--ww-table-rule);
+}
+
+.ww-contents-ops .ww-table tbody td {
+  height: 34px;
+  padding: 0 6px;
+}
+
+/* Social calendar — compact editorial ops grid */
+.ww-social-calendar-page .ww-calendar-toolbar {
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px solid var(--ww-border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.ww-social-calendar-page .ww-calendar-toolbar .ww-social-field {
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--ww-border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.ww-social-calendar-shell {
+  border: 1px solid var(--ww-border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.ww-social-calendar-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.ww-social-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid var(--ww-table-rule);
+  background: rgb(248 249 251 / 0.55);
+}
+
+.ww-social-calendar-weekday {
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ww-text-muted);
+  letter-spacing: 0;
+}
+
+.ww-social-calendar-month {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+}
+
+.ww-social-calendar-day {
+  min-height: 118px;
+  border-right: 1px solid var(--ww-table-rule);
+  border-bottom: 1px solid var(--ww-table-rule);
+  padding: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.ww-social-calendar-day.is-outside {
+  background: rgb(248 249 251 / 0.45);
+}
+
+.ww-social-calendar-day.is-weekend {
+  background: rgb(248 249 251 / 0.35);
+}
+
+.ww-social-calendar-day.is-outside.is-weekend {
+  background: rgb(244 246 248 / 0.55);
+}
+
+.ww-social-calendar-day.is-today {
+  background: rgb(67 97 238 / 0.035);
+}
+
+.ww-social-calendar-day.is-drop-over {
+  background: rgb(67 97 238 / 0.08);
+}
+
+.ww-social-calendar-week-wrap {
+  max-height: min(72vh, 720px);
+}
+
+.ww-social-calendar-week {
+  display: flex;
+  flex-direction: column;
+}
+
+.ww-social-calendar-week-head {
+  display: grid;
+  grid-template-columns: 44px repeat(7, minmax(96px, 1fr));
+  border-bottom: 1px solid var(--ww-table-rule);
+  background: rgb(248 249 251 / 0.55);
+}
+
+.ww-social-calendar-week-day-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px;
+  border-right: 1px solid var(--ww-table-rule);
+}
+
+.ww-social-calendar-week-day-head.is-today {
+  background: rgb(67 97 238 / 0.05);
+}
+
+.ww-social-calendar-week-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.ww-social-calendar-week-row {
+  display: grid;
+  grid-template-columns: 44px repeat(7, minmax(96px, 1fr));
+  min-height: 52px;
+  border-bottom: 1px solid var(--ww-table-rule);
+}
+
+.ww-social-calendar-time-gutter {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 4px 6px 0 0;
+  border-right: 1px solid var(--ww-table-rule);
+  background: rgb(248 249 251 / 0.35);
+}
+
+.ww-social-calendar-week-slot {
+  min-height: 52px;
+  border-right: 1px solid var(--ww-table-rule);
+  padding: 2px;
+  cursor: pointer;
+}
+
+.ww-social-calendar-week-slot.is-drop-over {
+  background: rgb(67 97 238 / 0.08);
+}
+
+.ww-social-calendar-unscheduled {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  z-index: 45;
+  width: min(360px, calc(100vw - 32px));
+  border: 1px solid var(--ww-border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--ww-shadow-float);
+}
+
+/* Markalar ops list — compact rows + balanced toolbar */
+.ww-brands-toolbar {
+  gap: 6px;
+  min-height: 40px;
+  padding: 0;
+}
+
+.ww-brands-toolbar .ww-brands-search {
+  flex: 0 1 300px;
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.ww-brands-ops .ww-table thead th {
+  height: 28px;
+  padding: 0 8px;
+  background: transparent;
+  letter-spacing: 0;
+}
+
+.ww-brands-ops .ww-table tbody td {
+  height: 42px;
+  padding-top: 0;
+  padding-bottom: 0;
+  vertical-align: middle;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

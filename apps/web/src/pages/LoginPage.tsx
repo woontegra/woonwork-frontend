@@ -58,15 +58,15 @@ export function LoginPage() {
             transition={{ duration: 0.45 }}
             className="hidden lg:block"
           >
-            <p className="font-display text-5xl leading-none text-white xl:text-6xl">WoonWork</p>
-            <p className="mt-5 max-w-xl text-lg text-navy-200">
-              Şirketinizin projelerini, görevlerini ve belgelerini tek premium çalışma alanında yönetin.
+            <p className="text-5xl font-semibold tracking-[-0.04em] text-white xl:text-6xl">WoonWork</p>
+            <p className="mt-5 max-w-xl text-lg text-ink-300">
+              Şirketinizin projelerini, görevlerini ve belgelerini tek çalışma masasında yönetin.
             </p>
-            <div className="mt-10 grid max-w-lg gap-3 text-sm text-navy-300">
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
+            <div className="mt-10 grid max-w-lg gap-3 text-sm text-ink-300">
+              <div className="border border-white/10 bg-white/5 px-4 py-3">
                 Çok kiracılı mimari · güvenli tenant izolasyonu
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
+              <div className="border border-white/10 bg-white/5 px-4 py-3">
                 Projeler, görevler, notlar ve ekip tek yerde
               </div>
             </div>
@@ -79,13 +79,13 @@ export function LoginPage() {
             className="mx-auto w-full max-w-md"
           >
             <div className="mb-8 lg:hidden">
-              <p className="font-display text-4xl text-white">WoonWork</p>
-              <p className="mt-2 text-sm text-navy-300">Şirket çalışma platformu</p>
+              <p className="text-4xl font-semibold tracking-tight text-white">WoonWork</p>
+              <p className="mt-2 text-sm text-ink-300">Şirket çalışma platformu</p>
             </div>
 
             <form
               onSubmit={onSubmit}
-              className="rounded-3xl border border-white/10 bg-white p-7 text-navy-900 shadow-2xl shadow-black/30"
+              className="border border-white/10 bg-white p-7 text-[var(--ww-text)] shadow-[var(--ww-shadow-overlay)]"
             >
               <h1 className="text-2xl font-semibold tracking-tight">Giriş Yap</h1>
               <p className="mt-1 text-sm text-navy-500">Hesabınızla çalışma alanınıza devam edin.</p>

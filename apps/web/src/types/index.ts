@@ -23,9 +23,11 @@ export interface ProjectDto {
   description: string | null;
   status: string;
   createdById: string;
+  workspaceAreaId?: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy?: { id: string; firstName: string; lastName: string; email?: string };
+  workspaceArea?: { id: string; name: string; icon: string | null } | null;
   _count?: { tasks: number };
 }
 
@@ -55,9 +57,11 @@ export interface PageDto {
   icon: string | null;
   coverUrl: string | null;
   createdById: string;
+  workspaceAreaId?: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy?: { id: string; firstName: string; lastName: string; email?: string };
+  workspaceArea?: { id: string; name: string; icon: string | null } | null;
   children?: Array<{
     id: string;
     title: string;
@@ -66,6 +70,12 @@ export interface PageDto {
     updatedAt: string;
   }>;
   parent?: { id: string; title: string; icon: string | null } | null;
+  ancestors?: Array<{
+    id: string;
+    title: string;
+    icon: string | null;
+    workspaceAreaId: string | null;
+  }>;
   _count?: { children: number };
 }
 

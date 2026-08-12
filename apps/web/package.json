@@ -15,6 +15,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@vercel/blob": "^2.8.0",
     "@woonwork/shared": "*",
     "framer-motion": "^12.5.0",
     "lucide-react": "^0.483.0",

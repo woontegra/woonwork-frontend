@@ -1,6 +1,8 @@
 import { useState, type KeyboardEvent } from 'react';
+import { FileText, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
 import { EditableText } from '../EditableText';
 import type { BlockContent } from '@woonwork/shared';
+import { formatBytes, type MediaAssetDto } from '../../../lib/media';
 
 interface CommonProps {
   content: BlockContent;
@@ -214,4 +216,179 @@ export function CodeBlock({
 
 export function DividerBlock() {
   return <hr className="my-3 border-0 border-t border-navy-200" />;
+}
+
+export function ImageBlock({
+  content,
+  onChange,
+  mediaAsset,
+  onPickMedia,
+}: {
+  content: BlockContent;
+  onChange: (content: BlockContent) => void;
+  mediaAsset?: MediaAssetDto | null;
+  onPickMedia: () => void;
+}) {
+  const align = content.align ?? 'center';
+  const alignClass =
+    align === 'left' ? 'mr-auto' : align === 'right' ? 'ml-auto' : 'mx-auto';
+
+  if (!mediaAsset?.url) {
+    return (
+      <button
+        type="button"
+        onClick={onPickMedia}
+        className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-navy-200 bg-navy-50/50 px-4 py-10 text-sm text-navy-500 transition hover:border-navy-300 hover:bg-navy-50"
+      >
+        <ImageIcon size={22} className="text-navy-400" />
+        Görsel seç veya yükle
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2 py-1">
+      <div className={`w-full max-w-3xl ${alignClass}`}>
+        <img
+          src={mediaAsset.url}
+          alt={content.alt || mediaAsset.originalFileName}
+          className="h-auto w-full rounded-lg object-contain"
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="rounded-lg px-2 py-1 text-xs text-navy-500 hover:bg-navy-50"
+          onClick={onPickMedia}
+        >
+          Değiştir
+        </button>
+        {(['left', 'center', 'right'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => onChange({ ...content, align: value })}
+            className={`rounded-lg px-2 py-1 text-xs ${
+              align === value ? 'bg-navy-900 text-white' : 'text-navy-500 hover:bg-navy-50'
+            }`}
+          >
+            {value === 'left' ? 'Sol' : value === 'right' ? 'Sağ' : 'Orta'}
+          </button>
+        ))}
+      </div>
+      <input
+        value={content.alt ?? ''}
+        onChange={(e) => onChange({ ...content, alt: e.target.value })}
+        placeholder="Alt metin"
+        className="w-full rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-xs text-navy-600 outline-none placeholder:text-navy-300 focus:border-navy-100"
+      />
+      <input
+        value={content.caption ?? ''}
+        onChange={(e) => onChange({ ...content, caption: e.target.value })}
+        placeholder="Başlık ekle..."
+        className="w-full rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-center text-sm text-navy-500 outline-none placeholder:text-navy-300 focus:border-navy-100"
+      />
+    </div>
+  );
+}
+
+export function VideoBlock({
+  content,
+  onChange,
+  mediaAsset,
+  onPickMedia,
+}: {
+  content: BlockContent;
+  onChange: (content: BlockContent) => void;
+  mediaAsset?: MediaAssetDto | null;
+  onPickMedia: () => void;
+}) {
+  if (!mediaAsset?.url) {
+    return (
+      <button
+        type="button"
+        onClick={onPickMedia}
+        className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-navy-200 bg-navy-50/50 px-4 py-10 text-sm text-navy-500 transition hover:border-navy-300 hover:bg-navy-50"
+      >
+        <VideoIcon size={22} className="text-navy-400" />
+        Video seç veya yükle
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2 py-1">
+      <video
+        src={mediaAsset.url}
+        controls
+        autoPlay={false}
+        className="aspect-video w-full rounded-lg bg-navy-950"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="rounded-lg px-2 py-1 text-xs text-navy-500 hover:bg-navy-50"
+          onClick={onPickMedia}
+        >
+          Değiştir
+        </button>
+      </div>
+      <input
+        value={content.caption ?? ''}
+        onChange={(e) => onChange({ ...content, caption: e.target.value })}
+        placeholder="Başlık ekle..."
+        className="w-full rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-center text-sm text-navy-500 outline-none placeholder:text-navy-300 focus:border-navy-100"
+      />
+    </div>
+  );
+}
+
+export function FileBlock({
+  mediaAsset,
+  onPickMedia,
+}: {
+  mediaAsset?: MediaAssetDto | null;
+  onPickMedia: () => void;
+}) {
+  if (!mediaAsset) {
+    return (
+      <button
+        type="button"
+        onClick={onPickMedia}
+        className="flex w-full items-center gap-3 rounded-xl border border-dashed border-navy-200 bg-navy-50/50 px-4 py-4 text-sm text-navy-500 transition hover:border-navy-300 hover:bg-navy-50"
+      >
+        <FileText size={18} className="text-navy-400" />
+        Dosya seç veya yükle
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-navy-100 bg-navy-50/40 px-3 py-2.5">
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-navy-500 ring-1 ring-navy-100">
+        <FileText size={16} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-navy-900">{mediaAsset.originalFileName}</p>
+        <p className="text-xs text-navy-400">{formatBytes(mediaAsset.size)}</p>
+      </div>
+      {mediaAsset.url ? (
+        <a
+          href={mediaAsset.url}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-navy-700 hover:bg-white"
+        >
+          Aç / İndir
+        </a>
+      ) : null}
+      <button
+        type="button"
+        className="rounded-lg px-2 py-1 text-xs text-navy-500 hover:bg-white"
+        onClick={onPickMedia}
+      >
+        Değiştir
+      </button>
+    </div>
+  );
 }

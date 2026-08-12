@@ -23,6 +23,7 @@ import { SlashMenu } from './SlashMenu';
 import { focusBlock } from './EditableText';
 import { useDebouncedCallback } from './useDebouncedCallback';
 import type { BlockDto, SaveStatus } from './types';
+import { createSubpage, notifyWorkspaceChanged } from '../../lib/workspace';
 
 interface BlockEditorProps {
   pageId: string;
@@ -80,6 +81,53 @@ export function BlockEditor({ pageId, onSaveStatusChange }: BlockEditorProps) {
     }
   }, 650);
 
+  const onMediaChange = useCallback(
+    async (blockId: string, asset: import('../../lib/media').MediaAssetDto | null) => {
+      const snapshot = blocksRef.current;
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId
+            ? { ...b, mediaAssetId: asset?.id ?? null, mediaAsset: asset }
+            : b,
+        ),
+      );
+      setStatus('saving');
+      try {
+        const updated = await apiRequest<BlockDto>(`/pages/${pageId}/blocks/${blockId}`, {
+          method: 'PATCH',
+          body: { mediaAssetId: asset?.id ?? null },
+        });
+        setBlocks((prev) => prev.map((b) => (b.id === blockId ? updated : b)));
+        setStatus('saved');
+      } catch (err) {
+        setBlocks(snapshot);
+        setStatus('error');
+        toast((err as Error).message || 'Medya bağlanamadı', 'error');
+      }
+    },
+    [pageId, setStatus, toast],
+  );
+
+  const onDatabaseChange = useCallback(
+    async (blockId: string, databaseId: string | null) => {
+      const snapshot = blocksRef.current;
+      setStatus('saving');
+      try {
+        const updated = await apiRequest<BlockDto>(`/pages/${pageId}/blocks/${blockId}`, {
+          method: 'PATCH',
+          body: { databaseId },
+        });
+        setBlocks((prev) => prev.map((b) => (b.id === blockId ? updated : b)));
+        setStatus('saved');
+      } catch (err) {
+        setBlocks(snapshot);
+        setStatus('error');
+        toast((err as Error).message || 'Tablo bağlanamadı', 'error');
+      }
+    },
+    [pageId, setStatus, toast],
+  );
+
   const onContentChange = useCallback(
     (blockId: string, content: BlockContent) => {
       setBlocks((prev) =>
@@ -120,6 +168,10 @@ export function BlockEditor({ pageId, onSaveStatusChange }: BlockEditorProps) {
         type,
         content: content ?? defaultBlockContent(type),
         position: (after?.position ?? 0) + 0.5,
+        mediaAssetId: null,
+        mediaAsset: null,
+        databaseId: null,
+        database: null,
         createdById: '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -207,7 +259,9 @@ export function BlockEditor({ pageId, onSaveStatusChange }: BlockEditorProps) {
       const snapshot = blocksRef.current;
       setBlocks((prev) =>
         prev.map((b) =>
-          b.id === blockId ? { ...b, type, content: nextContent } : b,
+          b.id === blockId
+            ? { ...b, type, content: nextContent, mediaAssetId: null, mediaAsset: null, databaseId: null, database: null }
+            : b,
         ),
       );
       setSlash({ open: false, blockId: null, query: '', mode: 'transform', rect: null });
@@ -216,7 +270,7 @@ export function BlockEditor({ pageId, onSaveStatusChange }: BlockEditorProps) {
       try {
         await apiRequest(`/pages/${pageId}/blocks/${blockId}`, {
           method: 'PATCH',
-          body: { type, content: nextContent },
+          body: { type, content: nextContent, mediaAssetId: null, databaseId: null },
         });
       } catch (err) {
         setBlocks(snapshot);
@@ -285,6 +339,29 @@ export function BlockEditor({ pageId, onSaveStatusChange }: BlockEditorProps) {
   const onSlashSelect = useCallback(
     async (type: BlockType) => {
       if (!slash.blockId) return;
+      if (type === 'SUBPAGE') {
+        const sourceId = slash.blockId;
+        const mode = slash.mode;
+        setSlash({ open: false, blockId: null, query: '', mode: 'transform', rect: null });
+        try {
+          await createSubpage(pageId, {
+            title: 'Adsız sayfa',
+            afterBlockId: sourceId,
+          });
+          if (mode === 'transform') {
+            const source = blocksRef.current.find((b) => b.id === sourceId);
+            const text = (source?.content as BlockContent | undefined)?.text ?? '';
+            if (source && !text.replace('/', '').trim() && blocksRef.current.length > 1) {
+              await deleteBlock(sourceId, false);
+            }
+          }
+          await load();
+          notifyWorkspaceChanged();
+        } catch (err) {
+          toast((err as Error).message || 'Alt sayfa oluşturulamadı', 'error');
+        }
+        return;
+      }
       if (slash.mode === 'insert') {
         setSlash({ open: false, blockId: null, query: '', mode: 'transform', rect: null });
         await createBlock(slash.blockId, type);
@@ -292,7 +369,7 @@ export function BlockEditor({ pageId, onSaveStatusChange }: BlockEditorProps) {
       }
       await transformBlock(slash.blockId, type);
     },
-    [createBlock, slash.blockId, slash.mode, transformBlock],
+    [createBlock, deleteBlock, load, pageId, slash.blockId, slash.mode, toast, transformBlock],
   );
 
   const sensors = useSensors(
@@ -358,6 +435,8 @@ export function BlockEditor({ pageId, onSaveStatusChange }: BlockEditorProps) {
                 isFirstEmpty={isFirstEmpty && block.id === blocks[0]?.id}
                 focusId={focusId}
                 onContentChange={onContentChange}
+                onMediaChange={(blockId, asset) => void onMediaChange(blockId, asset)}
+                onDatabaseChange={(blockId, databaseId) => void onDatabaseChange(blockId, databaseId)}
                 onKeyDown={onKeyDown}
                 onOpenSlash={(blockId, rect, mode) =>
                   setSlash({ open: true, blockId, query: '', mode, rect })

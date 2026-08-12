@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { apiRequest } from '../lib/api';
 import type { MemberDto } from '../types';
 import { useTenant } from '../contexts/TenantContext';
 import { useToast } from '../components/ui/Toast';
-import { EmptyState, Skeleton } from '../components/ui/PageLoader';
-import { Badge } from '../components/ui/Form';
+import { EmptyState, PageCanvas, PageHeader, Skeleton } from '../components/ui/PageLoader';
+import { StatusChip } from '../components/ui/Form';
 import { formatDate, fullName, roleLabels } from '../lib/labels';
 
 export function TeamPage() {
@@ -32,54 +33,54 @@ export function TeamPage() {
 
   if (loading) {
     return (
-      <div className="space-y-3">
+      <PageCanvas mode="DATA_WIDE">
+        <Skeleton className="h-10 w-48" />
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-16" />
         ))}
-      </div>
+      </PageCanvas>
     );
   }
 
-  if (!members.length) {
-    return <EmptyState title="Üye bulunamadı" description="Bu çalışma alanında henüz üye yok." />;
-  }
-
   return (
-    <div className="overflow-hidden rounded-2xl border border-navy-100 bg-white">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b border-navy-100 bg-navy-50/60 text-xs uppercase tracking-wide text-navy-500">
-          <tr>
-            <th className="px-4 py-3 font-semibold">Üye</th>
-            <th className="px-4 py-3 font-semibold">E-posta</th>
-            <th className="px-4 py-3 font-semibold">Rol</th>
-            <th className="px-4 py-3 font-semibold">Katılım</th>
-          </tr>
-        </thead>
-        <tbody>
-          {members.map((member) => (
-            <tr key={member.id} className="border-b border-navy-50 last:border-0">
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-navy-900 text-xs font-semibold text-white">
-                    {member.user.firstName?.[0]?.toUpperCase() || 'U'}
-                  </div>
-                  <div>
-                    <p className="font-medium text-navy-900">{fullName(member.user)}</p>
-                    <p className="text-xs text-navy-400">
-                      {member.user.isActive ? 'Aktif' : 'Pasif'}
-                    </p>
-                  </div>
-                </div>
-              </td>
-              <td className="px-4 py-3 text-navy-600">{member.user.email}</td>
-              <td className="px-4 py-3">
-                <Badge tone="blue">{roleLabels[member.role] ?? member.role}</Badge>
-              </td>
-              <td className="px-4 py-3 text-navy-500">{formatDate(member.createdAt)}</td>
-            </tr>
+    <PageCanvas mode="DATA_WIDE">
+      <PageHeader
+        hideTitle
+        description={`${members.length} üye · ${activeTenant?.name ?? 'çalışma alanı'}`}
+      />
+
+      {!members.length ? (
+        <EmptyState title="Üye bulunamadı" />
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          {members.map((member, i) => (
+            <motion.div
+              key={member.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.03 }}
+              className="flex items-center gap-3 border border-[var(--ww-border)] bg-white px-3 py-3"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-ink-900 text-xs font-semibold text-white">
+                {(member.user.firstName?.[0] || '?').toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-[var(--ww-text)]">
+                  {fullName(member.user)}
+                </p>
+                <p className="truncate text-xs text-[var(--ww-text-muted)]">{member.user.email}</p>
+                <p className="mt-1 text-[10px] text-[var(--ww-text-muted)]">
+                  Katılım {formatDate(member.createdAt)}
+                </p>
+              </div>
+              <StatusChip
+                label={roleLabels[member.role] ?? member.role}
+                tone={member.role === 'OWNER' || member.role === 'ADMIN' ? 'blue' : 'neutral'}
+              />
+            </motion.div>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </div>
+      )}
+    </PageCanvas>
   );
 }

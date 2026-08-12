@@ -1,14 +1,16 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { apiRequest } from '../lib/api';
 import type { ProjectDto } from '../types';
 import { useTenant } from '../contexts/TenantContext';
 import { useToast } from '../components/ui/Toast';
-import { EmptyState, Skeleton } from '../components/ui/PageLoader';
-import { Badge, Button, Input, Select, TextArea } from '../components/ui/Form';
+import { EmptyState, PageCanvas, PageHeader, PageToolbar, Skeleton } from '../components/ui/PageLoader';
+import { Button, Input, SearchInput, Select, StatusChip, TextArea } from '../components/ui/Form';
 import { Modal } from '../components/ui/Modal';
 import { formatDate, projectStatusLabels } from '../lib/labels';
+import { ContentAccessActions } from '../components/library/ContentAccessActions';
 
 const statuses = ['ACTIVE', 'ON_HOLD', 'COMPLETED', 'ARCHIVED'];
 
@@ -18,18 +20,20 @@ export function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
+  const [qDebounced, setQDebounced] = useState('');
   const [status, setStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ProjectDto | null>(null);
   const [form, setForm] = useState({ name: '', description: '', status: 'ACTIVE' });
   const [saving, setSaving] = useState(false);
+  const [accessProject, setAccessProject] = useState<ProjectDto | null>(null);
 
   async function load() {
     if (!activeTenant) return;
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (q) params.set('q', q);
+      if (qDebounced) params.set('q', qDebounced);
       if (status) params.set('status', status);
       const data = await apiRequest<ProjectDto[]>(`/projects?${params.toString()}`);
       setProjects(data);
@@ -41,9 +45,14 @@ export function ProjectsPage() {
   }
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setQDebounced(q), 250);
+    return () => window.clearTimeout(timer);
+  }, [q]);
+
+  useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTenant, status]);
+  }, [activeTenant, status, qDebounced]);
 
   const filteredHint = useMemo(() => `${projects.length} proje`, [projects.length]);
 
@@ -109,49 +118,34 @@ export function ProjectsPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 flex-col gap-3 sm:flex-row">
-          <div className="relative min-w-[220px] flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-400" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void load();
-              }}
-              placeholder="Proje ara..."
-              className="w-full rounded-xl border border-navy-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-navy-400 focus:ring-4 focus:ring-navy-100"
-            />
-          </div>
-          <Select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="sm:w-44"
-          >
-            <option value="">Tüm durumlar</option>
-            {statuses.map((s) => (
-              <option key={s} value={s}>
-                {projectStatusLabels[s]}
-              </option>
-            ))}
-          </Select>
-          <Button variant="secondary" onClick={() => void load()}>
-            Filtrele
-          </Button>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus size={16} />
+    <PageCanvas mode="DATA_WIDE">
+      <PageHeader hideTitle description={`${filteredHint} · çalışma alanınız`} />
+
+      <PageToolbar>
+        <SearchInput value={q} onChange={setQ} placeholder="Proje ara..." size="sm" />
+        <Select
+          size="sm"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className="w-full sm:w-[168px]"
+        >
+          <option value="">Durum: Tümü</option>
+          {statuses.map((s) => (
+            <option key={s} value={s}>
+              {projectStatusLabels[s]}
+            </option>
+          ))}
+        </Select>
+        <Button className="ml-auto" onClick={openCreate}>
+          <Plus size={14} strokeWidth={1.75} />
           Yeni Proje
         </Button>
-      </div>
-
-      <p className="text-xs text-navy-400">{filteredHint}</p>
+      </PageToolbar>
 
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-16" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-36" />
           ))}
         </div>
       ) : !projects.length ? (
@@ -160,68 +154,106 @@ export function ProjectsPage() {
           description="Yeni bir proje oluşturarak ekibinizle çalışmaya başlayın."
           action={
             <Button onClick={openCreate}>
-              <Plus size={16} />
+              <Plus size={14} strokeWidth={1.75} />
               Yeni Proje
             </Button>
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-navy-100 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-navy-100 bg-navy-50/60 text-xs uppercase tracking-wide text-navy-500">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Proje</th>
-                <th className="px-4 py-3 font-semibold">Durum</th>
-                <th className="px-4 py-3 font-semibold">Görev</th>
-                <th className="px-4 py-3 font-semibold">Güncelleme</th>
-                <th className="px-4 py-3 font-semibold" />
-              </tr>
-            </thead>
-            <tbody>
-              <AnimatePresence>
-                {projects.map((project) => (
-                  <motion.tr
-                    key={project.id}
-                    layout
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="border-b border-navy-50 last:border-0 hover:bg-navy-50/40"
-                  >
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-navy-900">{project.name}</p>
-                      <p className="line-clamp-1 text-xs text-navy-400">{project.description || 'Açıklama yok'}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge tone="blue">{projectStatusLabels[project.status]}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-navy-600">{project._count?.tasks ?? 0}</td>
-                    <td className="px-4 py-3 text-navy-500">{formatDate(project.updatedAt)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(project)}
-                          className="rounded-lg p-2 text-navy-500 hover:bg-navy-100 hover:text-navy-800"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void onDelete(project)}
-                          className="rounded-lg p-2 text-rose-500 hover:bg-rose-50"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
-            </tbody>
-          </table>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <AnimatePresence>
+            {projects.map((project, i) => (
+              <motion.article
+                key={project.id}
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ delay: i * 0.03 }}
+                whileHover={{ y: -2 }}
+                className="group border border-[var(--ww-border)] bg-white p-4 transition hover:border-accent/25 hover:shadow-[var(--ww-shadow-sm)]"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-[15px] font-semibold tracking-tight text-[var(--ww-text)]">
+                      <Link to={`/projeler/${project.id}`} className="hover:underline">
+                        {project.name}
+                      </Link>
+                    </h3>
+                    <p className="mt-1 line-clamp-2 text-xs text-[var(--ww-text-muted)]">
+                      {project.description || 'Açıklama yok'}
+                    </p>
+                  </div>
+                  <StatusChip
+                    label={projectStatusLabels[project.status]}
+                    tone={project.status === 'ACTIVE' ? 'blue' : 'neutral'}
+                  />
+                </div>
+                <div className="mt-4 flex items-center justify-between border-t border-[var(--ww-border)] pt-3">
+                  <p className="text-xs text-[var(--ww-text-secondary)]">
+                    <span className="font-semibold text-[var(--ww-text)]">
+                      {project._count?.tasks ?? 0}
+                    </span>{' '}
+                    görev · {formatDate(project.updatedAt)}
+                  </p>
+                  <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => setAccessProject(project)}
+                      className="rounded px-1.5 py-1 text-[11px] font-medium text-[var(--ww-text-muted)] hover:bg-ink-50 hover:text-[var(--ww-text)]"
+                    >
+                      Paylaş
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(project)}
+                      className="rounded p-1.5 text-[var(--ww-text-muted)] hover:bg-ink-50 hover:text-[var(--ww-text)]"
+                      aria-label="Düzenle"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void onDelete(project)}
+                      className="rounded p-1.5 text-[var(--ww-text-muted)] hover:bg-danger-soft hover:text-danger"
+                      aria-label="Sil"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              </motion.article>
+            ))}
+          </AnimatePresence>
         </div>
       )}
+
+      {accessProject ? (
+        <div className="fixed bottom-4 right-4 z-40 max-w-md border border-[var(--ww-border)] bg-white p-3 shadow-[var(--ww-shadow-md)]">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="truncate text-sm font-semibold text-[var(--ww-text)]">
+              {accessProject.name}
+            </p>
+            <button
+              type="button"
+              className="text-xs text-[var(--ww-text-muted)] hover:text-[var(--ww-text)]"
+              onClick={() => setAccessProject(null)}
+            >
+              Kapat
+            </button>
+          </div>
+          <ContentAccessActions
+            resourceType="PROJECT"
+            resourceId={accessProject.id}
+            areaId={accessProject.workspaceAreaId}
+            areaName={accessProject.workspaceArea?.name}
+            onMoved={() => {
+              setAccessProject(null);
+              void load();
+            }}
+          />
+        </div>
+      ) : null}
 
       <Modal
         open={modalOpen}
@@ -262,6 +294,6 @@ export function ProjectsPage() {
           </div>
         </form>
       </Modal>
-    </div>
+    </PageCanvas>
   );
 }

@@ -4,8 +4,8 @@ import { apiRequest } from '../lib/api';
 import type { TaskDto } from '../types';
 import { useTenant } from '../contexts/TenantContext';
 import { useToast } from '../components/ui/Toast';
-import { EmptyState, Skeleton } from '../components/ui/PageLoader';
-import { Badge } from '../components/ui/Form';
+import { EmptyState, PageCanvas, PageHeader, Skeleton } from '../components/ui/PageLoader';
+import { Button, PriorityMark } from '../components/ui/Form';
 import { taskPriorityLabels } from '../lib/labels';
 
 const weekDays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
@@ -77,44 +77,53 @@ export function CalendarPage() {
   }, [tasks]);
 
   if (loading) {
-    return <Skeleton className="h-[560px]" />;
+    return (
+      <PageCanvas mode="DATA_WIDE">
+        <Skeleton className="h-[560px] w-full" />
+      </PageCanvas>
+    );
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold capitalize text-navy-900">{monthLabel}</h2>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="rounded-xl border border-navy-200 bg-white p-2 text-navy-600 hover:bg-navy-50"
-            onClick={() =>
-              setCursor((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))
-            }
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <button
-            type="button"
-            className="rounded-xl border border-navy-200 bg-white px-3 py-2 text-sm font-medium text-navy-700 hover:bg-navy-50"
-            onClick={() => {
-              const now = new Date();
-              setCursor(new Date(now.getFullYear(), now.getMonth(), 1));
-            }}
-          >
-            Bugün
-          </button>
-          <button
-            type="button"
-            className="rounded-xl border border-navy-200 bg-white p-2 text-navy-600 hover:bg-navy-50"
-            onClick={() =>
-              setCursor((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
-            }
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      </div>
+    <PageCanvas mode="DATA_WIDE">
+      <PageHeader
+        hideTitle
+        description="Son tarihli işler · aylık görünüm"
+        actions={
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="secondary"
+              size="icon"
+              aria-label="Önceki ay"
+              onClick={() => setCursor((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+            >
+              <ChevronLeft size={16} />
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                const now = new Date();
+                setCursor(new Date(now.getFullYear(), now.getMonth(), 1));
+              }}
+            >
+              Bugün
+            </Button>
+            <Button
+              variant="secondary"
+              size="icon"
+              aria-label="Sonraki ay"
+              onClick={() => setCursor((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+            >
+              <ChevronRight size={16} />
+            </Button>
+          </div>
+        }
+      />
+
+      <p className="text-sm font-semibold capitalize tracking-tight text-[var(--ww-text)]">
+        {monthLabel}
+      </p>
 
       {!tasks.length ? (
         <EmptyState
@@ -123,10 +132,13 @@ export function CalendarPage() {
         />
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-navy-100 bg-white">
-        <div className="grid grid-cols-7 border-b border-navy-100 bg-navy-50/70">
+      <div className="overflow-hidden border border-[var(--ww-border)] bg-white">
+        <div className="grid grid-cols-7 border-b border-[var(--ww-border)] bg-[#f8f9fb]">
           {weekDays.map((d) => (
-            <div key={d} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-navy-500">
+            <div
+              key={d}
+              className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ww-text-muted)]"
+            >
               {d}
             </div>
           ))}
@@ -139,13 +151,17 @@ export function CalendarPage() {
             return (
               <div
                 key={day.toISOString()}
-                className={`min-h-[110px] border-b border-r border-navy-50 p-2 ${
-                  inMonth ? 'bg-white' : 'bg-navy-50/40'
+                className={`min-h-[118px] border-b border-r border-[var(--ww-border)] p-2 ${
+                  inMonth ? 'bg-white' : 'bg-canvas/70'
                 }`}
               >
                 <div
-                  className={`mb-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-                    isToday ? 'bg-navy-900 text-white' : inMonth ? 'text-navy-800' : 'text-navy-300'
+                  className={`mb-2 inline-flex h-7 min-w-7 items-center justify-center px-1.5 text-xs font-semibold ${
+                    isToday
+                      ? 'bg-accent text-white'
+                      : inMonth
+                        ? 'text-[var(--ww-text)]'
+                        : 'text-[var(--ww-text-muted)]'
                   }`}
                 >
                   {day.getDate()}
@@ -154,14 +170,22 @@ export function CalendarPage() {
                   {dayTasks.slice(0, 3).map((task) => (
                     <div
                       key={task.id}
-                      className="truncate rounded-md bg-accent-soft px-1.5 py-1 text-[11px] font-medium text-navy-800"
+                      className="border-l-2 border-accent bg-accent-soft/70 px-1.5 py-1"
                       title={task.title}
                     >
-                      {task.title}
+                      <p className="truncate text-[10px] font-semibold text-[var(--ww-text)]">
+                        {task.title}
+                      </p>
+                      <p className="truncate text-[9px] text-[var(--ww-text-muted)]">
+                        {taskPriorityLabels[task.priority]}
+                        {task.status ? ` · ${task.status}` : ''}
+                      </p>
                     </div>
                   ))}
                   {dayTasks.length > 3 ? (
-                    <p className="text-[10px] text-navy-400">+{dayTasks.length - 3} daha</p>
+                    <p className="text-[10px] text-[var(--ww-text-muted)]">
+                      +{dayTasks.length - 3} daha
+                    </p>
                   ) : null}
                 </div>
               </div>
@@ -171,8 +195,8 @@ export function CalendarPage() {
       </div>
 
       {tasks.length ? (
-        <div className="rounded-2xl border border-navy-100 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-navy-900">Bu ayın görevleri</h3>
+        <div className="border border-[var(--ww-border)] bg-white p-4">
+          <h3 className="mb-3 text-sm font-semibold text-[var(--ww-text)]">Bu ayın görevleri</h3>
           <ul className="space-y-2">
             {tasks
               .filter((t) => {
@@ -182,13 +206,16 @@ export function CalendarPage() {
               })
               .map((task) => (
                 <li key={task.id} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="truncate font-medium text-navy-800">{task.title}</span>
-                  <Badge>{taskPriorityLabels[task.priority]}</Badge>
+                  <span className="truncate font-medium text-[var(--ww-text)]">{task.title}</span>
+                  <PriorityMark
+                    label={taskPriorityLabels[task.priority]}
+                    level={task.priority}
+                  />
                 </li>
               ))}
           </ul>
         </div>
       ) : null}
-    </div>
+    </PageCanvas>
   );
 }
