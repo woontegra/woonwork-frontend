@@ -12,6 +12,7 @@ router.get('/', projectController.list);
 router.post('/', requireRole('MEMBER'), projectController.create);
 router.get('/:id', projectController.getById);
 router.patch('/:id', requireRole('EDITOR'), projectController.update);
+router.post('/:id/move', requireRole('MEMBER'), projectController.move);
 router.delete('/:id', requireRole('ADMIN'), projectController.remove);
 
 export default router;

@@ -7,14 +7,12 @@ import {
 import type { TaskPriority, TaskStatus } from '@prisma/client';
 import { AppError } from '../lib/errors';
 import { prisma } from '../lib/prisma';
-
-async function assertProjectInTenant(tenantId: string, projectId: string | null | undefined) {
-  if (!projectId) return;
-  const project = await prisma.project.findFirst({ where: { id: projectId, tenantId } });
-  if (!project) {
-    throw new AppError(400, 'INVALID_PROJECT', 'Proje bu çalışma alanına ait değil');
-  }
-}
+import {
+  accessibleWhere,
+  assertCanEdit,
+  assertCanView,
+  type AccessContext,
+} from './contentAccess.service';
 
 async function assertAssigneeInTenant(tenantId: string, assigneeId: string | null | undefined) {
   if (!assigneeId) return;
@@ -26,8 +24,28 @@ async function assertAssigneeInTenant(tenantId: string, assigneeId: string | nul
   }
 }
 
+async function assertTaskAccess(ctx: AccessContext, taskId: string, mode: 'VIEW' | 'EDIT') {
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, tenantId: ctx.tenantId },
+    select: { id: true, projectId: true, createdById: true },
+  });
+  if (!task) throw new AppError(404, 'TASK_NOT_FOUND', 'Görev bulunamadı');
+
+  if (task.projectId) {
+    if (mode === 'EDIT') await assertCanEdit(ctx, 'PROJECT', task.projectId);
+    else await assertCanView(ctx, 'PROJECT', task.projectId);
+    return task;
+  }
+
+  // Projectless tasks: creator or tenant admin
+  if (task.createdById === ctx.userId) return task;
+  const { hasMinRole } = await import('@woonwork/shared');
+  if (hasMinRole(ctx.tenantRole, 'ADMIN')) return task;
+  throw new AppError(404, 'TASK_NOT_FOUND', 'Görev bulunamadı');
+}
+
 export async function listTasks(
-  tenantId: string,
+  ctx: AccessContext,
   filters?: {
     status?: string;
     priority?: string;
@@ -36,21 +54,44 @@ export async function listTasks(
     q?: string;
   },
 ) {
+  const projectAccess = await accessibleWhere(ctx, 'PROJECT');
+  const accessibleProjects = await prisma.project.findMany({
+    where: projectAccess as object,
+    select: { id: true },
+  });
+  const projectIds = accessibleProjects.map((p) => p.id);
+
+  if (filters?.projectId) {
+    if (!projectIds.includes(filters.projectId)) {
+      return [];
+    }
+  }
+
   return prisma.task.findMany({
     where: {
-      tenantId,
-      ...(filters?.status ? { status: filters.status as TaskStatus } : {}),
-      ...(filters?.priority ? { priority: filters.priority as TaskPriority } : {}),
-      ...(filters?.projectId ? { projectId: filters.projectId } : {}),
-      ...(filters?.assigneeId ? { assigneeId: filters.assigneeId } : {}),
-      ...(filters?.q
-        ? {
-            OR: [
-              { title: { contains: filters.q, mode: 'insensitive' } },
-              { description: { contains: filters.q, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
+      tenantId: ctx.tenantId,
+      AND: [
+        {
+          OR: [
+            { projectId: { in: projectIds } },
+            { projectId: null, createdById: ctx.userId },
+          ],
+        },
+        ...(filters?.status ? [{ status: filters.status as TaskStatus }] : []),
+        ...(filters?.priority ? [{ priority: filters.priority as TaskPriority }] : []),
+        ...(filters?.projectId ? [{ projectId: filters.projectId }] : []),
+        ...(filters?.assigneeId ? [{ assigneeId: filters.assigneeId }] : []),
+        ...(filters?.q
+          ? [
+              {
+                OR: [
+                  { title: { contains: filters.q, mode: 'insensitive' as const } },
+                  { description: { contains: filters.q, mode: 'insensitive' as const } },
+                ],
+              },
+            ]
+          : []),
+      ],
     },
     include: {
       project: { select: { id: true, name: true } },
@@ -65,9 +106,10 @@ export async function listTasks(
   });
 }
 
-export async function getTask(tenantId: string, id: string) {
+export async function getTask(ctx: AccessContext, id: string) {
+  await assertTaskAccess(ctx, id, 'VIEW');
   const task = await prisma.task.findFirst({
-    where: { id, tenantId },
+    where: { id, tenantId: ctx.tenantId },
     include: {
       project: { select: { id: true, name: true } },
       assignee: {
@@ -86,15 +128,17 @@ export async function getTask(tenantId: string, id: string) {
   return task;
 }
 
-export async function createTask(tenantId: string, userId: string, raw: CreateTaskInput) {
+export async function createTask(ctx: AccessContext, raw: CreateTaskInput) {
   const input = createTaskSchema.parse(raw);
-  await assertProjectInTenant(tenantId, input.projectId);
-  await assertAssigneeInTenant(tenantId, input.assigneeId);
+  if (input.projectId) {
+    await assertCanEdit(ctx, 'PROJECT', input.projectId);
+  }
+  await assertAssigneeInTenant(ctx.tenantId, input.assigneeId);
 
   return prisma.task.create({
     data: {
-      tenantId,
-      createdById: userId,
+      tenantId: ctx.tenantId,
+      createdById: ctx.userId,
       title: input.title,
       description: input.description ?? null,
       status: input.status ?? 'TODO',
@@ -115,15 +159,15 @@ export async function createTask(tenantId: string, userId: string, raw: CreateTa
   });
 }
 
-export async function updateTask(tenantId: string, id: string, raw: UpdateTaskInput) {
+export async function updateTask(ctx: AccessContext, id: string, raw: UpdateTaskInput) {
   const input = updateTaskSchema.parse(raw);
-  await getTask(tenantId, id);
+  await assertTaskAccess(ctx, id, 'EDIT');
 
-  if (input.projectId !== undefined) {
-    await assertProjectInTenant(tenantId, input.projectId);
+  if (input.projectId) {
+    await assertCanEdit(ctx, 'PROJECT', input.projectId);
   }
   if (input.assigneeId !== undefined) {
-    await assertAssigneeInTenant(tenantId, input.assigneeId);
+    await assertAssigneeInTenant(ctx.tenantId, input.assigneeId);
   }
 
   return prisma.task.update({
@@ -151,7 +195,7 @@ export async function updateTask(tenantId: string, id: string, raw: UpdateTaskIn
   });
 }
 
-export async function deleteTask(tenantId: string, id: string) {
-  await getTask(tenantId, id);
+export async function deleteTask(ctx: AccessContext, id: string) {
+  await assertTaskAccess(ctx, id, 'EDIT');
   await prisma.task.delete({ where: { id } });
 }

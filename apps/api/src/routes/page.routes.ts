@@ -25,6 +25,9 @@ router.delete('/:pageId/blocks/:blockId', requireRole('EDITOR'), blockController
 
 router.get('/:id', pageController.getById);
 router.patch('/:id', requireRole('EDITOR'), pageController.update);
+router.post('/:id/move', requireRole('MEMBER'), pageController.move);
+router.post('/:id/duplicate', requireRole('MEMBER'), pageController.duplicate);
+router.post('/:id/subpages', requireRole('MEMBER'), pageController.createSubpage);
 router.delete('/:id', requireRole('EDITOR'), pageController.remove);
 
 export default router;

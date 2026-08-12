@@ -109,7 +109,7 @@ describe('block service tenant isolation', () => {
     });
 
     await expect(
-      blockService.updateBlock(ids.tenantA, ids.pageA, foreign.id, {
+      blockService.updateBlock(ids.tenantA, ids.pageA, foreign.id, ids.userA, {
         content: { text: 'hack' },
       }),
     ).rejects.toMatchObject({ code: 'BLOCK_NOT_FOUND' });
@@ -129,12 +129,12 @@ describe('block service tenant isolation', () => {
     });
     expect(second.position).toBeGreaterThan(first.position);
 
-    const updated = await blockService.updateBlock(ids.tenantA, ids.pageA, first.id, {
+    const updated = await blockService.updateBlock(ids.tenantA, ids.pageA, first.id, ids.userA, {
       content: { text: 'Bir güncellendi' },
     });
     expect((updated.content as { text: string }).text).toBe('Bir güncellendi');
 
-    const reordered = await blockService.reorderBlocks(ids.tenantA, ids.pageA, {
+    const reordered = await blockService.reorderBlocks(ids.tenantA, ids.pageA, ids.userA, {
       orderedIds: [second.id, first.id],
     });
     expect(reordered.map((b: Block) => b.id)).toEqual([second.id, first.id]);

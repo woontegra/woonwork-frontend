@@ -35,6 +35,7 @@ export async function update(req: Request, res: Response, next: NextFunction) {
       req.tenant!.id,
       req.params.pageId,
       req.params.blockId,
+      req.user!.id,
       req.body,
     );
     res.json(ok(data));
@@ -62,6 +63,7 @@ export async function reorder(req: Request, res: Response, next: NextFunction) {
     const data = await blockService.reorderBlocks(
       req.tenant!.id,
       req.params.pageId,
+      req.user!.id,
       req.body,
     );
     res.json(ok(data));

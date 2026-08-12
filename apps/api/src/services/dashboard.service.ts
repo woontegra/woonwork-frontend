@@ -1,4 +1,6 @@
 import { prisma } from '../lib/prisma';
+import { accessibleWhere, type AccessContext } from './contentAccess.service';
+import { listRecents } from './recent.service';
 
 function startOfDay(date = new Date()) {
   const d = new Date(date);
@@ -12,11 +14,20 @@ function endOfDay(date = new Date()) {
   return d;
 }
 
-export async function getDashboard(tenantId: string) {
+export async function getDashboard(ctx: AccessContext) {
   const todayStart = startOfDay();
   const todayEnd = endOfDay();
   const soon = new Date();
   soon.setDate(soon.getDate() + 7);
+
+  const projectWhere = await accessibleWhere(ctx, 'PROJECT');
+  const pageWhere = await accessibleWhere(ctx, 'PAGE');
+
+  const accessibleProjects = await prisma.project.findMany({
+    where: projectWhere as object,
+    select: { id: true },
+  });
+  const projectIds = accessibleProjects.map((p) => p.id);
 
   const [
     activeProjectsCount,
@@ -27,24 +38,32 @@ export async function getDashboard(tenantId: string) {
     upcomingTasks,
   ] = await Promise.all([
     prisma.project.count({
-      where: { tenantId, status: 'ACTIVE' },
+      where: { ...(projectWhere as object), status: 'ACTIVE' },
     }),
     prisma.task.count({
       where: {
-        tenantId,
+        tenantId: ctx.tenantId,
         status: { in: ['TODO', 'IN_PROGRESS', 'IN_REVIEW'] },
+        OR: [
+          { projectId: { in: projectIds } },
+          { projectId: null, createdById: ctx.userId },
+        ],
       },
     }),
     prisma.task.count({
       where: {
-        tenantId,
+        tenantId: ctx.tenantId,
         dueDate: { gte: todayStart, lte: todayEnd },
         status: { notIn: ['DONE', 'CANCELLED'] },
+        OR: [
+          { projectId: { in: projectIds } },
+          { projectId: null, createdById: ctx.userId },
+        ],
       },
     }),
-    prisma.page.count({ where: { tenantId } }),
+    prisma.page.count({ where: pageWhere as object }),
     prisma.project.findMany({
-      where: { tenantId },
+      where: projectWhere as object,
       orderBy: { updatedAt: 'desc' },
       take: 5,
       include: {
@@ -56,9 +75,13 @@ export async function getDashboard(tenantId: string) {
     }),
     prisma.task.findMany({
       where: {
-        tenantId,
+        tenantId: ctx.tenantId,
         dueDate: { gte: todayStart, lte: soon },
         status: { notIn: ['DONE', 'CANCELLED'] },
+        OR: [
+          { projectId: { in: projectIds } },
+          { projectId: null, createdById: ctx.userId },
+        ],
       },
       orderBy: { dueDate: 'asc' },
       take: 8,
@@ -71,18 +94,33 @@ export async function getDashboard(tenantId: string) {
     }),
   ]);
 
-  const recentPages = await prisma.page.findMany({
-    where: { tenantId },
-    orderBy: { updatedAt: 'desc' },
-    take: 5,
-    select: {
-      id: true,
-      title: true,
-      icon: true,
-      updatedAt: true,
-      parentId: true,
-    },
-  });
+  const recents = await listRecents(ctx, 5);
+  const recentPages = recents
+    .filter((r) => r.resourceType === 'PAGE')
+    .map((r) => ({
+      id: r.resourceId,
+      title: r.name,
+      icon: r.icon,
+      updatedAt: r.lastOpenedAt,
+      parentId: null as string | null,
+    }));
+
+  // Fallback: accessible pages by updatedAt if no recents yet
+  const pagesFallback =
+    recentPages.length > 0
+      ? recentPages
+      : await prisma.page.findMany({
+          where: pageWhere as object,
+          orderBy: { updatedAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            title: true,
+            icon: true,
+            updatedAt: true,
+            parentId: true,
+          },
+        });
 
   return {
     stats: {
@@ -93,6 +131,7 @@ export async function getDashboard(tenantId: string) {
     },
     recentProjects,
     upcomingTasks,
-    recentPages,
+    recentPages: pagesFallback,
+    recents,
   };
 }

@@ -1,5 +1,6 @@
 import {
   BlockType,
+  categoryForBlockType,
   createBlockSchema,
   defaultBlockContent,
   reorderBlocksSchema,
@@ -15,7 +16,18 @@ import { prisma } from '../lib/prisma';
 export const POSITION_STEP = 1000;
 const MIN_GAP = 0.001;
 
-async function assertPageInTenant(tenantId: string, pageId: string) {
+const blockInclude = {
+  mediaAsset: true,
+  database: {
+    include: {
+      properties: { orderBy: { position: 'asc' as const } },
+      views: { orderBy: { createdAt: 'asc' as const } },
+      _count: { select: { rows: true } },
+    },
+  },
+} satisfies Prisma.BlockInclude;
+
+async function assertPageInTenant(tenantId: string, pageId: string, userId?: string) {
   const page = await prisma.page.findFirst({
     where: { id: pageId, tenantId },
     select: { id: true },
@@ -23,12 +35,30 @@ async function assertPageInTenant(tenantId: string, pageId: string) {
   if (!page) {
     throw new AppError(404, 'PAGE_NOT_FOUND', 'Sayfa bulunamadı');
   }
+  if (userId) {
+    const membership = await prisma.tenantMember.findUnique({
+      where: { userId_tenantId: { userId, tenantId } },
+    });
+    if (!membership) {
+      throw new AppError(404, 'PAGE_NOT_FOUND', 'Sayfa bulunamadı');
+    }
+    const { resolveAccess } = await import('./contentAccess.service');
+    const level = await resolveAccess(
+      { tenantId, userId, tenantRole: membership.role },
+      'PAGE',
+      pageId,
+    );
+    if (level === 'NONE') {
+      throw new AppError(404, 'PAGE_NOT_FOUND', 'Sayfa bulunamadı');
+    }
+  }
   return page;
 }
 
 async function getBlockInPage(tenantId: string, pageId: string, blockId: string) {
   const block = await prisma.block.findFirst({
     where: { id: blockId, tenantId, pageId },
+    include: blockInclude,
   });
   if (!block) {
     throw new AppError(404, 'BLOCK_NOT_FOUND', 'Blok bulunamadı');
@@ -43,6 +73,58 @@ async function assertParentBlock(
 ) {
   if (!parentBlockId) return null;
   return getBlockInPage(tenantId, pageId, parentBlockId);
+}
+
+async function assertMediaForBlock(
+  tenantId: string,
+  blockType: string,
+  mediaAssetId: string | null | undefined,
+) {
+  if (mediaAssetId === undefined) return undefined;
+  if (mediaAssetId === null) return null;
+
+  const asset = await prisma.mediaAsset.findFirst({
+    where: { id: mediaAssetId, tenantId },
+  });
+  if (!asset) {
+    throw new AppError(400, 'INVALID_MEDIA', 'Medya bu çalışma alanına ait değil');
+  }
+
+  if (blockType === BlockType.FILE) {
+    if (asset.category !== 'DOCUMENT' && asset.category !== 'OTHER') {
+      throw new AppError(400, 'INVALID_MEDIA_CATEGORY', 'Dosya bloğu yalnız belge kabul eder');
+    }
+    return mediaAssetId;
+  }
+
+  const required = categoryForBlockType(blockType as (typeof BlockType)[keyof typeof BlockType]);
+  if (required && asset.category !== required) {
+    throw new AppError(400, 'INVALID_MEDIA_CATEGORY', 'Medya türü bu blokla uyumlu değil');
+  }
+
+  return mediaAssetId;
+}
+
+async function assertDatabaseForBlock(
+  tenantId: string,
+  blockType: string,
+  databaseId: string | null | undefined,
+) {
+  if (databaseId === undefined) return undefined;
+  if (databaseId === null) return null;
+
+  if (blockType !== BlockType.DATABASE) {
+    throw new AppError(400, 'INVALID_DATABASE', 'Yalnız akıllı tablo bloğu tablo bağlayabilir');
+  }
+
+  const database = await prisma.database.findFirst({
+    where: { id: databaseId, tenantId },
+    select: { id: true },
+  });
+  if (!database) {
+    throw new AppError(400, 'INVALID_DATABASE', 'Akıllı tablo bu çalışma alanına ait değil');
+  }
+  return databaseId;
 }
 
 function toJsonContent(content: unknown): Prisma.InputJsonValue {
@@ -66,16 +148,18 @@ export async function ensureDefaultParagraph(
       position: POSITION_STEP,
       createdById: userId,
     },
+    include: blockInclude,
   });
 }
 
 export async function listBlocks(tenantId: string, pageId: string, userId: string) {
-  await assertPageInTenant(tenantId, pageId);
+  await assertPageInTenant(tenantId, pageId, userId);
   await ensureDefaultParagraph(tenantId, pageId, userId);
 
   return prisma.block.findMany({
     where: { tenantId, pageId },
     orderBy: { position: 'asc' },
+    include: blockInclude,
   });
 }
 
@@ -150,7 +234,7 @@ export async function createBlock(
   raw: CreateBlockInput,
 ) {
   const input = createBlockSchema.parse(raw);
-  await assertPageInTenant(tenantId, pageId);
+  await assertPageInTenant(tenantId, pageId, userId);
   await assertParentBlock(tenantId, pageId, input.parentBlockId);
 
   if (input.afterBlockId) {
@@ -165,6 +249,8 @@ export async function createBlock(
   );
 
   const content = input.content ?? defaultBlockContent(input.type);
+  const mediaAssetId = await assertMediaForBlock(tenantId, input.type, input.mediaAssetId);
+  const databaseId = await assertDatabaseForBlock(tenantId, input.type, input.databaseId);
 
   return prisma.block.create({
     data: {
@@ -175,7 +261,10 @@ export async function createBlock(
       content: toJsonContent(content),
       position,
       parentBlockId: input.parentBlockId ?? null,
+      mediaAssetId: mediaAssetId ?? null,
+      databaseId: databaseId ?? null,
     },
+    include: blockInclude,
   });
 }
 
@@ -183,11 +272,12 @@ export async function updateBlock(
   tenantId: string,
   pageId: string,
   blockId: string,
+  userId: string,
   raw: UpdateBlockInput,
 ) {
   const input = updateBlockSchema.parse(raw);
-  await assertPageInTenant(tenantId, pageId);
-  await getBlockInPage(tenantId, pageId, blockId);
+  await assertPageInTenant(tenantId, pageId, userId);
+  const existing = await getBlockInPage(tenantId, pageId, blockId);
 
   if (input.parentBlockId !== undefined && input.parentBlockId !== null) {
     if (input.parentBlockId === blockId) {
@@ -196,13 +286,26 @@ export async function updateBlock(
     await assertParentBlock(tenantId, pageId, input.parentBlockId);
   }
 
+  const nextType = input.type ?? existing.type;
+  const mediaAssetId =
+    input.mediaAssetId !== undefined
+      ? await assertMediaForBlock(tenantId, nextType, input.mediaAssetId)
+      : undefined;
+  const databaseId =
+    input.databaseId !== undefined
+      ? await assertDatabaseForBlock(tenantId, nextType, input.databaseId)
+      : undefined;
+
   return prisma.block.update({
     where: { id: blockId },
     data: {
       ...(input.type !== undefined ? { type: input.type } : {}),
       ...(input.content !== undefined ? { content: toJsonContent(input.content) } : {}),
       ...(input.parentBlockId !== undefined ? { parentBlockId: input.parentBlockId } : {}),
+      ...(mediaAssetId !== undefined ? { mediaAssetId } : {}),
+      ...(databaseId !== undefined ? { databaseId } : {}),
     },
+    include: blockInclude,
   });
 }
 
@@ -212,7 +315,7 @@ export async function deleteBlock(
   blockId: string,
   userId: string,
 ) {
-  await assertPageInTenant(tenantId, pageId);
+  await assertPageInTenant(tenantId, pageId, userId);
   await getBlockInPage(tenantId, pageId, blockId);
 
   const remaining = await prisma.block.count({
@@ -232,10 +335,11 @@ export async function deleteBlock(
 export async function reorderBlocks(
   tenantId: string,
   pageId: string,
+  userId: string,
   raw: ReorderBlocksInput,
 ) {
   const input = reorderBlocksSchema.parse(raw);
-  await assertPageInTenant(tenantId, pageId);
+  await assertPageInTenant(tenantId, pageId, userId);
 
   const existing = await prisma.block.findMany({
     where: { tenantId, pageId, parentBlockId: null },
@@ -266,6 +370,7 @@ export async function reorderBlocks(
   return prisma.block.findMany({
     where: { tenantId, pageId },
     orderBy: { position: 'asc' },
+    include: blockInclude,
   });
 }
 
@@ -275,7 +380,7 @@ export async function duplicateBlock(
   blockId: string,
   userId: string,
 ) {
-  await assertPageInTenant(tenantId, pageId);
+  await assertPageInTenant(tenantId, pageId, userId);
   const source = await getBlockInPage(tenantId, pageId, blockId);
 
   const position = await computePosition(
@@ -294,6 +399,9 @@ export async function duplicateBlock(
       content: source.content as Prisma.InputJsonValue,
       position,
       parentBlockId: source.parentBlockId,
+      mediaAssetId: source.mediaAssetId,
+      databaseId: source.databaseId,
     },
+    include: blockInclude,
   });
 }
